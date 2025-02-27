@@ -1,0 +1,16 @@
+POST localhost:8080/update/gauge/cpu.usage.total/100.01
+
+###
+POST localhost:8080/update/counter/add.product/10
+
+### shoud be Method Not Allowed
+GET localhost:8080/update/counter/add.product/10
+
+### shoud be Bad Request
+POST localhost:8080/update/gauge/add.product/aa
+
+### shoud be Bad Request
+POST localhost:8080/update/gauge123/add.product/100.1
+
+### shoud be NotFound
+POST localhost:8080/update/gauge123/100.1
