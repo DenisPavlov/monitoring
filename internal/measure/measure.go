@@ -40,7 +40,7 @@ func Gauge() map[string]float64 {
 	}
 }
 
-func Count(counters map[string]int) map[string]int {
+func Count(counters map[string]int64) map[string]int64 {
 	counters["PollCount"] = counters["PollCount"] + 1
 	return counters
 }

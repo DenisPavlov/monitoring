@@ -1,10 +1,9 @@
 package main
 
 import (
-	client2 "github.com/DenisPavlov/monitoring/internal/client"
+	"github.com/DenisPavlov/monitoring/internal/client"
 	"github.com/DenisPavlov/monitoring/internal/measure"
 	"log"
-	"net/http"
 	"time"
 )
 
@@ -14,15 +13,15 @@ const (
 )
 
 func main() {
-	if err := run(&http.Client{}); err != nil {
+	if err := run(); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func run(client *http.Client) error {
-	counts := make(map[string]int)
+func run() error {
+	counts := make(map[string]int64)
 	var gauges map[string]float64
-	count := 0
+	count := 1
 
 	for {
 		if count%pollIntervalSec == 0 {
@@ -31,10 +30,9 @@ func run(client *http.Client) error {
 		}
 
 		if count%reportIntervalSec == 0 {
-			if err := client2.PostMetrics(client, counts, gauges); err != nil {
+			if err := client.PostMetrics(counts, gauges); err != nil {
 				return err
 			}
-
 		}
 
 		count++

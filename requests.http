@@ -14,3 +14,7 @@ POST localhost:8080/update/gauge123/add.product/100.1
 
 ### shoud be NotFound
 POST localhost:8080/update/gauge123/100.1
+
+###
+POST http://localhost:8080/update/gauge/Lookups/0.000001
+Content-Type: text/plain

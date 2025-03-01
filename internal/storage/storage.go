@@ -1,16 +1,8 @@
 package storage
 
 type Storage interface {
-	addGauge(name string, value float64)
-	addCounter(name string, value int64)
-}
-
-func AddGauge(s Storage, name string, value float64) {
-	s.addGauge(name, value)
-}
-
-func AddCounter(s Storage, name string, value int64) {
-	s.addCounter(name, value)
+	AddGauge(name string, value float64)
+	AddCounter(name string, value int64)
 }
 
 type MemStorage struct {
@@ -25,10 +17,18 @@ func NewMemStorage() *MemStorage {
 	}
 }
 
-func (s *MemStorage) addGauge(name string, value float64) {
+func (s *MemStorage) AddGauge(name string, value float64) {
 	s.gauges[name] = value
 }
 
-func (s *MemStorage) addCounter(name string, value int64) {
+func (s *MemStorage) AddCounter(name string, value int64) {
 	s.counter[name] = s.counter[name] + value
+}
+
+func (s *MemStorage) Gauge(name string) float64 {
+	return s.gauges[name]
+}
+
+func (s *MemStorage) Counter(name string) int64 {
+	return s.counter[name]
 }

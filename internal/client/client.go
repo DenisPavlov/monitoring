@@ -5,18 +5,21 @@ import (
 	"net/http"
 )
 
-func postMetric(client *http.Client, url string) error {
-	_, err := client.Post(url, "text/plain", http.NoBody)
+func postMetric(url string) error {
+	resp, err := http.Post(url, "text/plain", http.NoBody)
 	if err != nil {
+		return err
+	}
+	if err := resp.Body.Close(); err != nil {
 		return err
 	}
 	return nil
 }
 
-func PostMetrics(client *http.Client, counts map[string]int, gauges map[string]float64) error {
+func PostMetrics(counts map[string]int64, gauges map[string]float64) error {
 	for name, value := range gauges {
 		url := fmt.Sprintf("http://localhost:8080/update/gauge/%s/%f", name, value)
-		err := postMetric(client, url)
+		err := postMetric(url)
 		if err != nil {
 			return err
 		}
@@ -24,7 +27,7 @@ func PostMetrics(client *http.Client, counts map[string]int, gauges map[string]f
 
 	for name, value := range counts {
 		url := fmt.Sprintf("http://localhost:8080/update/counter/%s/%d", name, value)
-		err := postMetric(client, url)
+		err := postMetric(url)
 		if err != nil {
 			return err
 		}
