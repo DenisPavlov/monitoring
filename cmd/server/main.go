@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/DenisPavlov/monitoring/internal"
+	storage2 "github.com/DenisPavlov/monitoring/internal/storage"
 	"net/http"
 	"strconv"
 	"strings"
@@ -14,7 +14,7 @@ const (
 	updateBasePath    = "/update/"
 )
 
-var storage = internal.NewMemStorage()
+var storage = storage2.NewMemStorage()
 
 func main() {
 	if err := run(); err != nil {
@@ -46,14 +46,14 @@ func saveMetric(w http.ResponseWriter, req *http.Request) {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		internal.AddGauge(storage, name, value)
+		storage2.AddGauge(storage, name, value)
 	case counterMetricName:
 		value, err := strconv.ParseInt(strValue, 10, 64)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		internal.AddCounter(storage, name, value)
+		storage2.AddCounter(storage, name, value)
 	default:
 		w.WriteHeader(http.StatusBadRequest)
 	}

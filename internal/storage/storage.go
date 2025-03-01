@@ -1,4 +1,4 @@
-package internal
+package storage
 
 type Storage interface {
 	addGauge(name string, value float64)
