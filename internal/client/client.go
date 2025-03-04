@@ -16,9 +16,9 @@ func postMetric(url string) error {
 	return nil
 }
 
-func PostMetrics(counts map[string]int64, gauges map[string]float64) error {
+func PostMetrics(host string, counts map[string]int64, gauges map[string]float64) error {
 	for name, value := range gauges {
-		url := fmt.Sprintf("http://localhost:8080/update/gauge/%s/%f", name, value)
+		url := fmt.Sprintf("http://"+host+"/update/gauge/%s/%f", name, value)
 		err := postMetric(url)
 		if err != nil {
 			return err
@@ -26,7 +26,7 @@ func PostMetrics(counts map[string]int64, gauges map[string]float64) error {
 	}
 
 	for name, value := range counts {
-		url := fmt.Sprintf("http://localhost:8080/update/counter/%s/%d", name, value)
+		url := fmt.Sprintf(host+"/update/counter/%s/%d", name, value)
 		err := postMetric(url)
 		if err != nil {
 			return err

@@ -7,12 +7,8 @@ import (
 	"time"
 )
 
-const (
-	pollIntervalSec   = 2
-	reportIntervalSec = 10
-)
-
 func main() {
+	parseFlags()
 	if err := run(); err != nil {
 		log.Fatal(err)
 	}
@@ -24,13 +20,13 @@ func run() error {
 	count := 1
 
 	for {
-		if count%pollIntervalSec == 0 {
+		if count%flagPollInterval == 0 {
 			gauges = measure.Gauge()
 			counts = measure.Count(counts)
 		}
 
-		if count%reportIntervalSec == 0 {
-			if err := client.PostMetrics(counts, gauges); err != nil {
+		if count%flagReportInterval == 0 {
+			if err := client.PostMetrics(flagRunAddr, counts, gauges); err != nil {
 				return err
 			}
 		}
