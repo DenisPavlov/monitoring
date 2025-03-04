@@ -20,4 +20,13 @@ POST http://localhost:8080/update/gauge/Lookups/0.000001
 Content-Type: text/plain
 
 ###
-POST http://localhost:8080/update/gauge/Lookups/0.000001
+POST http://localhost:8080/update/gauge/Cut/0.000001
+
+### Get metric value
+GET localhost:8080/value/counter/add.product
+
+### Not Found
+GET localhost:8080/value/counter/add.product
+
+### get all metrics
+GET localhost:8080/

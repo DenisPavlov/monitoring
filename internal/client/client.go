@@ -5,7 +5,6 @@ import (
 	"net/http"
 )
 
-// todo -нужен рефакторинг на клиента
 func postMetric(url string) error {
 	resp, err := http.Post(url, "text/plain", http.NoBody)
 	if err != nil {
