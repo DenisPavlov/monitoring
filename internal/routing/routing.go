@@ -2,6 +2,7 @@ package routing
 
 import (
 	"fmt"
+	"github.com/DenisPavlov/monitoring/internal/logger"
 	"github.com/DenisPavlov/monitoring/internal/storage"
 	"github.com/go-chi/chi/v5"
 	"net/http"
@@ -17,6 +18,7 @@ const (
 
 func BuildRouter(storage storage.Storage) chi.Router {
 	r := chi.NewRouter()
+	r.Use(logger.RequestLogger)
 	r.Route(updateBasePath+"{mType}/{mName}/{mValue}", func(r chi.Router) {
 		r.Post("/", saveMetricsHandler(storage))
 	})
