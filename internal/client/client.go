@@ -1,12 +1,20 @@
 package client
 
 import (
-	"fmt"
+	"bytes"
+	"encoding/json"
+	"github.com/DenisPavlov/monitoring/internal/models"
 	"net/http"
 )
 
-func postMetric(url string) error {
-	resp, err := http.Post(url, "text/plain", http.NoBody)
+func postMetric(host string, metrics models.Metrics) error {
+
+	metricBytes, err := json.Marshal(metrics)
+	if err != nil {
+		return err
+	}
+
+	resp, err := http.Post("http://"+host+"/update", "application/json", bytes.NewBuffer(metricBytes))
 	if err != nil {
 		return err
 	}
@@ -18,16 +26,25 @@ func postMetric(url string) error {
 
 func PostMetrics(host string, counts map[string]int64, gauges map[string]float64) error {
 	for name, value := range gauges {
-		url := fmt.Sprintf("http://"+host+"/update/gauge/%s/%f", name, value)
-		err := postMetric(url)
+		metrics := models.Metrics{
+			ID:    name,
+			MType: "gauge",
+			Value: &value,
+		}
+
+		err := postMetric(host, metrics)
 		if err != nil {
 			return err
 		}
 	}
 
 	for name, value := range counts {
-		url := fmt.Sprintf(host+"/update/counter/%s/%d", name, value)
-		err := postMetric(url)
+		metrics := models.Metrics{
+			ID:    name,
+			MType: "counter",
+			Delta: &value,
+		}
+		err := postMetric(host, metrics)
 		if err != nil {
 			return err
 		}

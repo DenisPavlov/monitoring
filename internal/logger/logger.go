@@ -7,6 +7,7 @@ import (
 	"time"
 )
 
+// todo - Вопрос к ревьюеру. Нормально ли отдавать так log объект? Ведь его могут изменить
 var Log = log.New()
 
 func Initialize(level string, env string) error {
@@ -53,6 +54,12 @@ func RequestLogger(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 
+		Log.WithFields(log.Fields{
+			"method":        r.Method,
+			"path":          r.URL.Path,
+			"contentLength": r.ContentLength,
+		}).Info("got incoming HTTP request")
+
 		rd := &responseData{status: http.StatusOK}
 		lrw := loggingResponseWriter{
 			ResponseWriter: w,
@@ -66,6 +73,6 @@ func RequestLogger(next http.Handler) http.Handler {
 			"duration": time.Since(start),
 			"status":   rd.status,
 			"size":     rd.size,
-		}).Info("got incoming HTTP request")
+		}).Info("completed HTTP request")
 	})
 }

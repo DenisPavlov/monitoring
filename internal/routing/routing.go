@@ -1,8 +1,11 @@
 package routing
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/DenisPavlov/monitoring/internal/logger"
+	"github.com/DenisPavlov/monitoring/internal/models"
+	"github.com/DenisPavlov/monitoring/internal/service"
 	"github.com/DenisPavlov/monitoring/internal/storage"
 	"github.com/go-chi/chi/v5"
 	"net/http"
@@ -10,19 +13,23 @@ import (
 )
 
 const (
-	gaugeMetricName   = "gauge"
-	counterMetricName = "counter"
-	updateBasePath    = "/update/"
-	getBasePath       = "/value/"
+	updateBasePath = "/update"
+	getBasePath    = "/value"
 )
 
 func BuildRouter(storage storage.Storage) chi.Router {
 	r := chi.NewRouter()
 	r.Use(logger.RequestLogger)
-	r.Route(updateBasePath+"{mType}/{mName}/{mValue}", func(r chi.Router) {
-		r.Post("/", saveMetricsHandler(storage))
+	r.Route(updateBasePath, func(r chi.Router) {
+		r.Post("/", updateMetricHandler(storage))
+		r.Post("/{mType}/{mName}/{mValue}", saveMetricsHandler(storage))
 	})
-	r.Get(getBasePath+"{mType}/{mName}", getMetricHandler(storage))
+	r.Route(getBasePath, func(r chi.Router) {
+		r.Post("/", getJSONMetricHandler(storage))
+		r.Get("/{mType}/{mName}", getMetricHandler(storage))
+
+	})
+
 	r.Get("/", getAllMetricsHandler(storage))
 	return r
 }
@@ -33,25 +40,17 @@ func saveMetricsHandler(storage storage.Storage) http.HandlerFunc {
 		mName := chi.URLParam(r, "mName")
 		mValue := chi.URLParam(r, "mValue")
 
-		switch mType {
-		case gaugeMetricName:
-			value, err := strconv.ParseFloat(mValue, 64)
-			if err != nil {
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-			storage.AddGauge(mName, value)
-		case counterMetricName:
-			value, err := strconv.ParseInt(mValue, 10, 64)
-			if err != nil {
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-			storage.AddCounter(mName, value)
-		default:
+		req, err := metrics.CreateMetrics(mName, mType, mValue)
+		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
+			logger.Log.Errorf("Error creating metrics: %s", err.Error())
+			return
 		}
-		fmt.Println(storage)
+
+		if err := metrics.Save(req, storage); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
 	}
 }
 
@@ -60,29 +59,49 @@ func getMetricHandler(storage storage.Storage) http.HandlerFunc {
 		mType := chi.URLParam(r, "mType")
 		mName := chi.URLParam(r, "mName")
 
-		switch mType {
-		case gaugeMetricName:
-			metricValue, ok := storage.Gauge(mName)
-			if ok {
-				_, err := w.Write([]byte(fmt.Sprintf("%g", metricValue)))
-				if err != nil {
-					w.WriteHeader(http.StatusInternalServerError)
-					_, _ = w.Write([]byte(err.Error()))
-				}
-			} else {
-				w.WriteHeader(http.StatusNotFound)
+		res := metrics.Get(mName, mType, storage)
+		if res == nil {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+
+		if res.Value != nil {
+			_, err := w.Write([]byte(fmt.Sprintf("%g", *res.Value)))
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(err.Error()))
 			}
-		case counterMetricName:
-			metricValue, ok := storage.Counter(mName)
-			if ok {
-				_, err := w.Write([]byte(strconv.FormatInt(metricValue, 10)))
-				if err != nil {
-					w.WriteHeader(http.StatusInternalServerError)
-					_, _ = w.Write([]byte(err.Error()))
-				}
-			} else {
-				w.WriteHeader(http.StatusNotFound)
+		} else if res.Delta != nil {
+			_, err := w.Write([]byte(strconv.FormatInt(*res.Delta, 10)))
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(err.Error()))
 			}
+		}
+	}
+}
+
+func getJSONMetricHandler(storage storage.Storage) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req models.Metrics
+
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			logger.Log.Error("cannot decode request JSON body", err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		res := metrics.Get(req.ID, req.MType, storage)
+		if res == nil {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(res); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			logger.Log.Error("cannot encode metric JSON body", err)
+			return
 		}
 	}
 }
@@ -105,5 +124,29 @@ func getAllMetricsHandler(storage storage.Storage) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_, _ = w.Write([]byte(page))
+	}
+}
+
+func updateMetricHandler(storage storage.Storage) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req models.Metrics
+
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			logger.Log.Error("cannot decode request JSON body", err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		if err := metrics.Save(&req, storage); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(req); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			logger.Log.Error("cannot encode metric JSON body", err)
+			return
+		}
 	}
 }

@@ -26,7 +26,45 @@ POST http://localhost:8080/update/gauge/Cut/0.000001
 GET localhost:8080/value/counter/add.product
 
 ### Not Found
-GET localhost:8080/value/counter/add.product
+GET localhost:8080/value/counter/add.product1
 
 ### get all metrics
 GET localhost:8080/
+
+### update counter by json
+POST localhost:8080/update
+Content-Type: application/json
+
+{
+  "id": "add.product",
+  "type": "counter",
+  "delta": 10
+}
+
+### update gauge by json
+POST localhost:8080/update
+Content-Type: application/json
+
+{
+  "id": "cpu.usage.total",
+  "type": "gauge",
+  "value": 100.01
+}
+
+### get json metric by type
+POST localhost:8080/value/
+Content-Type: application/json
+
+{
+  "id": "cpu.usage.total",
+  "type": "gauge"
+}
+
+### get json metric by type
+POST localhost:8080/value/
+Content-Type: application/json
+
+{
+  "id": "add.product",
+  "type": "counter"
+}
