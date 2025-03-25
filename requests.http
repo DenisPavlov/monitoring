@@ -5,6 +5,7 @@ POST localhost:8080/update/counter/add.product/10
 
 ### shoud be Method Not Allowed
 GET localhost:8080/update/counter/add.product/10
+Accept-Encoding:
 
 ### shoud be Bad Request
 POST localhost:8080/update/gauge/add.product/aa
@@ -24,12 +25,14 @@ POST http://localhost:8080/update/gauge/Cut/0.000001
 
 ### Get metric value
 GET localhost:8080/value/counter/add.product
+Accept-Encoding:
 
 ### Not Found
 GET localhost:8080/value/counter/add.product1
 
 ### get all metrics
 GET localhost:8080/
+Accept-Encoding: gzip
 
 ### update counter by json
 POST localhost:8080/update
@@ -67,4 +70,15 @@ Content-Type: application/json
 {
   "id": "add.product",
   "type": "counter"
+}
+
+### update gauge by json wich compress
+POST localhost:8080/update
+Content-Type: application/json
+Accept-Encoding: gzip
+
+{
+  "id": "cpu.usage.total",
+  "type": "gauge",
+  "value": 100.01
 }

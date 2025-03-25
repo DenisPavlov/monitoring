@@ -3,6 +3,7 @@ package routing
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/DenisPavlov/monitoring/internal/compress"
 	"github.com/DenisPavlov/monitoring/internal/logger"
 	"github.com/DenisPavlov/monitoring/internal/models"
 	"github.com/DenisPavlov/monitoring/internal/service"
@@ -20,6 +21,7 @@ const (
 func BuildRouter(storage storage.Storage) chi.Router {
 	r := chi.NewRouter()
 	r.Use(logger.RequestLogger)
+	r.Use(compress.GzipMiddleware)
 	r.Route(updateBasePath, func(r chi.Router) {
 		r.Post("/", updateMetricHandler(storage))
 		r.Post("/{mType}/{mName}/{mValue}", saveMetricsHandler(storage))
@@ -27,7 +29,6 @@ func BuildRouter(storage storage.Storage) chi.Router {
 	r.Route(getBasePath, func(r chi.Router) {
 		r.Post("/", getJSONMetricHandler(storage))
 		r.Get("/{mType}/{mName}", getMetricHandler(storage))
-
 	})
 
 	r.Get("/", getAllMetricsHandler(storage))
@@ -132,7 +133,7 @@ func updateMetricHandler(storage storage.Storage) http.HandlerFunc {
 		var req models.Metrics
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			logger.Log.Error("cannot decode request JSON body", err)
+			logger.Log.Error("cannot decode request JSON body ", err)
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}

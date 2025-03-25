@@ -82,11 +82,13 @@ func TestGet(t *testing.T) {
 	defer srv.Close()
 
 	resp, err := resty.New().R().
+		SetHeader("Accept-Encoding", "").
 		Get(srv.URL + getBasePath + "/gauge/g1")
 	assert.NoError(t, err, "error making HTTP request")
 	assert.Equal(t, "1.001", string(resp.Body()))
 
 	resp, err = resty.New().R().
+		SetHeader("Accept-Encoding", "").
 		Get(srv.URL + getBasePath + "/counter/c1")
 	assert.NoError(t, err, "error making HTTP request")
 	assert.Equal(t, "2", string(resp.Body()))

@@ -2,6 +2,7 @@ package client
 
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"github.com/DenisPavlov/monitoring/internal/models"
 	"net/http"
@@ -9,12 +10,27 @@ import (
 
 func postMetric(host string, metrics models.Metrics) error {
 
-	metricBytes, err := json.Marshal(metrics)
+	var buffer bytes.Buffer
+	gzipWriter := gzip.NewWriter(&buffer)
+	err := json.NewEncoder(gzipWriter).Encode(metrics)
+	if err != nil {
+		return err
+	}
+	err = gzipWriter.Close()
 	if err != nil {
 		return err
 	}
 
-	resp, err := http.Post("http://"+host+"/update", "application/json", bytes.NewBuffer(metricBytes))
+	req, err := http.NewRequest("POST", "http://"+host+"/update", &buffer)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Encoding", "gzip")
+	req.Header.Set("Accept-Encoding", "gzip")
+
+	resp, err := http.DefaultClient.Do(req)
+
 	if err != nil {
 		return err
 	}
