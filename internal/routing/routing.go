@@ -48,7 +48,7 @@ func saveMetricsHandler(storage storage.Storage) http.HandlerFunc {
 			return
 		}
 
-		if err := metrics.Save(req, storage); err != nil {
+		if err = metrics.Save(req, storage); err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
@@ -139,6 +139,7 @@ func updateMetricHandler(storage storage.Storage) http.HandlerFunc {
 		}
 
 		if err := metrics.Save(&req, storage); err != nil {
+			logger.Log.Error("cannot save request data to storage ", err)
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}

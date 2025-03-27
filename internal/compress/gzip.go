@@ -2,6 +2,7 @@ package compress
 
 import (
 	"compress/gzip"
+	"github.com/DenisPavlov/monitoring/internal/logger"
 	"io"
 	"net/http"
 	"strings"
@@ -17,7 +18,7 @@ type compressWriter struct {
 func newCompressWriter(w http.ResponseWriter) *compressWriter {
 	return &compressWriter{
 		w:  w,
-		zw: gzip.NewWriter(w),
+		zw: nil,
 	}
 }
 
@@ -32,6 +33,7 @@ func (c *compressWriter) Write(p []byte) (int, error) {
 		strings.Contains(contentType, "application/json") || strings.Contains(contentType, "text/html")
 
 	if supportsContentType {
+		c.zw = gzip.NewWriter(c.w)
 		c.Header().Set("Content-Encoding", "gzip")
 		return c.zw.Write(p)
 	} else {
@@ -45,7 +47,10 @@ func (c *compressWriter) WriteHeader(statusCode int) {
 
 // Close закрывает gzip.Writer и досылает все данные из буфера.
 func (c *compressWriter) Close() error {
-	return c.zw.Close()
+	if c.zw != nil {
+		return c.zw.Close()
+	}
+	return nil
 }
 
 // compressReader реализует интерфейс io.ReadCloser и позволяет прозрачно для сервера
@@ -93,7 +98,11 @@ func GzipMiddleware(next http.Handler) http.Handler {
 			// меняем оригинальный http.ResponseWriter на новый
 			ow = cw
 			// не забываем отправить клиенту все сжатые данные после завершения middleware
-			defer cw.Close()
+			defer func() {
+				if err := cw.Close(); err != nil {
+					logger.Log.Errorf("failed to close compress writer: %v", err)
+				}
+			}()
 		}
 
 		// проверяем, что клиент отправил серверу сжатые данные в формате gzip
@@ -108,7 +117,11 @@ func GzipMiddleware(next http.Handler) http.Handler {
 			}
 			// меняем тело запроса на новое
 			r.Body = cr
-			defer cr.Close()
+			defer func() {
+				if err := cr.Close(); err != nil {
+					logger.Log.Errorf("failed to close compressreader: %v", err)
+				}
+			}()
 		}
 
 		// передаём управление хендлеру

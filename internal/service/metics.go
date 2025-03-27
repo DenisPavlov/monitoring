@@ -21,14 +21,18 @@ func Save(metrics *models.Metrics, storage storage.Storage) error {
 		if metrics.Value == nil {
 			return ErrWrongValue
 		}
-		storage.AddGauge(metrics.ID, *metrics.Value)
+		if err := storage.AddGauge(metrics.ID, *metrics.Value); err != nil {
+			return err
+		}
 		updatedValue, _ := storage.Gauge(metrics.ID)
 		*metrics.Value = updatedValue
 	case CounterMetricName:
 		if metrics.Delta == nil {
 			return ErrWrongValue
 		}
-		storage.AddCounter(metrics.ID, *metrics.Delta)
+		if err := storage.AddCounter(metrics.ID, *metrics.Delta); err != nil {
+			return err
+		}
 		updatedValue, _ := storage.Counter(metrics.ID)
 		*metrics.Delta = updatedValue
 	default:

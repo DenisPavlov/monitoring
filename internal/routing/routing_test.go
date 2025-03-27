@@ -23,7 +23,7 @@ func TestSaveMetrics(t *testing.T) {
 		{method: http.MethodPost, path: updateBasePath + "/counter/m1/aa", expectedCode: http.StatusBadRequest},
 	}
 
-	var storage = storage2.NewMemStorage()
+	var storage = storage2.NewMemStorage(false, "")
 	srv := httptest.NewServer(BuildRouter(storage))
 	defer srv.Close()
 
@@ -42,7 +42,7 @@ func TestSaveMetrics(t *testing.T) {
 }
 
 func TestGaugeAdd(t *testing.T) {
-	var storage = storage2.NewMemStorage()
+	var storage = storage2.NewMemStorage(false, "")
 	srv := httptest.NewServer(BuildRouter(storage))
 	defer srv.Close()
 
@@ -58,7 +58,7 @@ func TestGaugeAdd(t *testing.T) {
 }
 
 func TestCounterAdd(t *testing.T) {
-	var storage = storage2.NewMemStorage()
+	var storage = storage2.NewMemStorage(false, "")
 	srv := httptest.NewServer(BuildRouter(storage))
 	defer srv.Close()
 
@@ -74,9 +74,9 @@ func TestCounterAdd(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	var storage = storage2.NewMemStorage()
-	storage.AddGauge("g1", 1.001)
-	storage.AddCounter("c1", 2)
+	var storage = storage2.NewMemStorage(false, "")
+	_ = storage.AddGauge("g1", 1.001)
+	_ = storage.AddCounter("c1", 2)
 
 	srv := httptest.NewServer(BuildRouter(storage))
 	defer srv.Close()
