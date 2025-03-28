@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/DenisPavlov/monitoring/internal/client"
+	"github.com/DenisPavlov/monitoring/internal/logger"
 	"github.com/DenisPavlov/monitoring/internal/measure"
 	"log"
 	"time"
@@ -27,7 +28,7 @@ func run() error {
 
 		if count%flagReportInterval == 0 {
 			if err := client.PostMetrics(flagRunAddr, counts, gauges); err != nil {
-				return err
+				logger.Log.Error(err)
 			}
 		}
 

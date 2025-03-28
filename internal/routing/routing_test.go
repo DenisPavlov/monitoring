@@ -16,14 +16,14 @@ func TestSaveMetrics(t *testing.T) {
 		path         string
 		expectedCode int
 	}{
-		{method: http.MethodPost, path: updateBasePath + "gaugE", expectedCode: http.StatusNotFound},
-		{method: http.MethodPost, path: updateBasePath + gaugeMetricName + "/", expectedCode: http.StatusNotFound},
-		{method: http.MethodPost, path: updateBasePath + gaugeMetricName + "/m1/aa", expectedCode: http.StatusBadRequest},
-		{method: http.MethodPost, path: updateBasePath + counterMetricName + "/", expectedCode: http.StatusNotFound},
-		{method: http.MethodPost, path: updateBasePath + counterMetricName + "/m1/aa", expectedCode: http.StatusBadRequest},
+		{method: http.MethodPost, path: updateBasePath + "/gaugE", expectedCode: http.StatusNotFound},
+		{method: http.MethodPost, path: updateBasePath + "/gauge/", expectedCode: http.StatusNotFound},
+		{method: http.MethodPost, path: updateBasePath + "/gauge/m1/aa", expectedCode: http.StatusBadRequest},
+		{method: http.MethodPost, path: updateBasePath + "/counter/", expectedCode: http.StatusNotFound},
+		{method: http.MethodPost, path: updateBasePath + "/counter/m1/aa", expectedCode: http.StatusBadRequest},
 	}
 
-	var storage = storage2.NewMemStorage()
+	var storage = storage2.NewMemStorage(false, "")
 	srv := httptest.NewServer(BuildRouter(storage))
 	defer srv.Close()
 
@@ -42,13 +42,13 @@ func TestSaveMetrics(t *testing.T) {
 }
 
 func TestGaugeAdd(t *testing.T) {
-	var storage = storage2.NewMemStorage()
+	var storage = storage2.NewMemStorage(false, "")
 	srv := httptest.NewServer(BuildRouter(storage))
 	defer srv.Close()
 
 	resp, err := resty.New().R().
 		SetHeader("Content-Type", "text/plain").
-		Post(srv.URL + updateBasePath + "gauge/m1/1.01")
+		Post(srv.URL + updateBasePath + "/gauge/m1/1.01")
 
 	assert.NoError(t, err, "error making HTTP request")
 	assert.Equal(t, http.StatusOK, resp.StatusCode())
@@ -58,13 +58,13 @@ func TestGaugeAdd(t *testing.T) {
 }
 
 func TestCounterAdd(t *testing.T) {
-	var storage = storage2.NewMemStorage()
+	var storage = storage2.NewMemStorage(false, "")
 	srv := httptest.NewServer(BuildRouter(storage))
 	defer srv.Close()
 
 	resp, err := resty.New().R().
 		SetHeader("Content-Type", "text/plain").
-		Post(srv.URL + updateBasePath + "counter/m1/5")
+		Post(srv.URL + updateBasePath + "/counter/m1/5")
 
 	assert.NoError(t, err, "error making HTTP request")
 	assert.Equal(t, http.StatusOK, resp.StatusCode())
@@ -74,20 +74,22 @@ func TestCounterAdd(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	var storage = storage2.NewMemStorage()
-	storage.AddGauge("g1", 1.001)
-	storage.AddCounter("c1", 2)
+	var storage = storage2.NewMemStorage(false, "")
+	_ = storage.AddGauge("g1", 1.001)
+	_ = storage.AddCounter("c1", 2)
 
 	srv := httptest.NewServer(BuildRouter(storage))
 	defer srv.Close()
 
 	resp, err := resty.New().R().
-		Get(srv.URL + getBasePath + "gauge/g1")
+		SetHeader("Accept-Encoding", "").
+		Get(srv.URL + getBasePath + "/gauge/g1")
 	assert.NoError(t, err, "error making HTTP request")
 	assert.Equal(t, "1.001", string(resp.Body()))
 
 	resp, err = resty.New().R().
-		Get(srv.URL + getBasePath + "counter/c1")
+		SetHeader("Accept-Encoding", "").
+		Get(srv.URL + getBasePath + "/counter/c1")
 	assert.NoError(t, err, "error making HTTP request")
 	assert.Equal(t, "2", string(resp.Body()))
 }

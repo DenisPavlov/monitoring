@@ -1,12 +1,36 @@
 package client
 
 import (
-	"fmt"
+	"bytes"
+	"compress/gzip"
+	"encoding/json"
+	"github.com/DenisPavlov/monitoring/internal/models"
 	"net/http"
 )
 
-func postMetric(url string) error {
-	resp, err := http.Post(url, "text/plain", http.NoBody)
+func postMetric(host string, metrics models.Metrics) error {
+
+	var buffer bytes.Buffer
+	gzipWriter := gzip.NewWriter(&buffer)
+	err := json.NewEncoder(gzipWriter).Encode(metrics)
+	if err != nil {
+		return err
+	}
+	err = gzipWriter.Close()
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest("POST", "http://"+host+"/update", &buffer)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Encoding", "gzip")
+	req.Header.Set("Accept-Encoding", "gzip")
+
+	resp, err := http.DefaultClient.Do(req)
+
 	if err != nil {
 		return err
 	}
@@ -18,16 +42,25 @@ func postMetric(url string) error {
 
 func PostMetrics(host string, counts map[string]int64, gauges map[string]float64) error {
 	for name, value := range gauges {
-		url := fmt.Sprintf("http://"+host+"/update/gauge/%s/%f", name, value)
-		err := postMetric(url)
+		metrics := models.Metrics{
+			ID:    name,
+			MType: "gauge",
+			Value: &value,
+		}
+
+		err := postMetric(host, metrics)
 		if err != nil {
 			return err
 		}
 	}
 
 	for name, value := range counts {
-		url := fmt.Sprintf(host+"/update/counter/%s/%d", name, value)
-		err := postMetric(url)
+		metrics := models.Metrics{
+			ID:    name,
+			MType: "counter",
+			Delta: &value,
+		}
+		err := postMetric(host, metrics)
 		if err != nil {
 			return err
 		}
