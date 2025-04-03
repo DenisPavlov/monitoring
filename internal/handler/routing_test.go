@@ -1,4 +1,4 @@
-package routing
+package handler
 
 import (
 	storage2 "github.com/DenisPavlov/monitoring/internal/storage"

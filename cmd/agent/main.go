@@ -3,7 +3,7 @@ package main
 import (
 	"github.com/DenisPavlov/monitoring/internal/client"
 	"github.com/DenisPavlov/monitoring/internal/logger"
-	"github.com/DenisPavlov/monitoring/internal/measure"
+	"github.com/DenisPavlov/monitoring/internal/service"
 	"log"
 	"time"
 )
@@ -22,8 +22,8 @@ func run() error {
 
 	for {
 		if count%flagPollInterval == 0 {
-			gauges = measure.Gauge()
-			counts = measure.Count(counts)
+			gauges = metrics.Gauge()
+			counts = metrics.Count(counts)
 		}
 
 		if count%flagReportInterval == 0 {

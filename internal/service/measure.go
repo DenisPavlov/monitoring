@@ -1,4 +1,4 @@
-package measure
+package metrics
 
 import (
 	"math/rand"

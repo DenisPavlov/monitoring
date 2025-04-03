@@ -1,9 +1,8 @@
-package routing
+package handler
 
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/DenisPavlov/monitoring/internal/compress"
 	"github.com/DenisPavlov/monitoring/internal/logger"
 	"github.com/DenisPavlov/monitoring/internal/models"
 	"github.com/DenisPavlov/monitoring/internal/service"
@@ -21,7 +20,7 @@ const (
 func BuildRouter(storage storage.Storage) chi.Router {
 	r := chi.NewRouter()
 	r.Use(logger.RequestLogger)
-	r.Use(compress.GzipMiddleware)
+	r.Use(GzipMiddleware)
 	r.Route(updateBasePath, func(r chi.Router) {
 		r.Post("/", updateMetricHandler(storage))
 		r.Post("/{mType}/{mName}/{mValue}", saveMetricsHandler(storage))

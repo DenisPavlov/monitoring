@@ -1,8 +1,8 @@
 package main
 
 import (
+	"github.com/DenisPavlov/monitoring/internal/handler"
 	"github.com/DenisPavlov/monitoring/internal/logger"
-	"github.com/DenisPavlov/monitoring/internal/routing"
 	"github.com/DenisPavlov/monitoring/internal/storage"
 	"net/http"
 	"os"
@@ -37,7 +37,7 @@ func run() error {
 		memStorage = storage.NewMemStorage(flagStoreInterval == 0, flagFileStoragePath)
 	}
 
-	router := routing.BuildRouter(memStorage)
+	router := handler.BuildRouter(memStorage)
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
