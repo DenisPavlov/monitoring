@@ -82,3 +82,6 @@ Accept-Encoding: gzip
   "type": "gauge",
   "value": 100.01
 }
+
+### scheck sql connection
+GET localhost:8080/ping

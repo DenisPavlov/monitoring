@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"github.com/DenisPavlov/monitoring/internal/logger"
@@ -10,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"net/http"
 	"strconv"
+	"time"
 )
 
 const (
@@ -17,7 +20,7 @@ const (
 	getBasePath    = "/value"
 )
 
-func BuildRouter(storage storage.Storage) chi.Router {
+func BuildRouter(storage storage.Storage, db *sql.DB) chi.Router {
 	r := chi.NewRouter()
 	r.Use(logger.RequestLogger)
 	r.Use(GzipMiddleware)
@@ -29,9 +32,23 @@ func BuildRouter(storage storage.Storage) chi.Router {
 		r.Post("/", getJSONMetricHandler(storage))
 		r.Get("/{mType}/{mName}", getMetricHandler(storage))
 	})
+	r.Get("/ping", pingDBHandler(db))
 
 	r.Get("/", getAllMetricsHandler(storage))
 	return r
+}
+
+func pingDBHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+		defer cancel()
+
+		if err := db.PingContext(ctx); err != nil {
+			logger.Log.Error("Error pinging database: ", err)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+		w.WriteHeader(http.StatusOK)
+	}
 }
 
 func saveMetricsHandler(storage storage.Storage) http.HandlerFunc {
