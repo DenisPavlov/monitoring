@@ -7,12 +7,12 @@ import (
 )
 
 func TestNewMemStorage(t *testing.T) {
-	s := NewMemStorage(false, "")
+	s := NewMemStorage()
 	assert.NotNil(t, s)
 }
 
 func TestMemStorage_Add(t *testing.T) {
-	s := NewMemStorage(false, "")
+	s := NewMemStorage()
 	_ = s.AddCounter("m1", 1)
 	_ = s.AddGauge("m1", 1.01)
 
@@ -26,7 +26,7 @@ func TestMemStorage_Add(t *testing.T) {
 }
 
 func TestMemStorage_All(t *testing.T) {
-	s := NewMemStorage(false, "")
+	s := NewMemStorage()
 	_ = s.AddCounter("c1", 1)
 	_ = s.AddCounter("c2", 1)
 	_ = s.AddGauge("g1", 1.01)

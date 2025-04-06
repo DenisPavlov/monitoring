@@ -26,32 +26,21 @@ func run() error {
 		return err
 	}
 
-	var memStorage *storage.MemStorage
-	if flagRestore {
-		store, err := storage.LoadFromFile(flagStoreInterval == 0, flagFileStoragePath)
-		if err != nil {
-			logger.Log.Error("Can not load storage from file. ", err.Error())
-			store = storage.NewMemStorage(flagStoreInterval == 0, flagFileStoragePath)
-		}
-		memStorage = store
-	} else {
-		memStorage = storage.NewMemStorage(flagStoreInterval == 0, flagFileStoragePath)
-	}
-
 	db, err := database.InitDB(flagDatabaseDSN)
 	if err != nil {
 		return err
 	}
 	defer db.Close()
 
-	router := handler.BuildRouter(memStorage, db)
+	store := initStorage()
+	router := handler.BuildRouter(store, db)
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
 	go func() {
 		for sig := range c {
 			logger.Log.Infoln("Server shutting down", sig)
-			err = shutDown(flagFileStoragePath, memStorage)
+			err = shutDown(flagFileStoragePath, store)
 			if err != nil {
 				logger.Log.Errorln(err)
 			}
@@ -59,7 +48,7 @@ func run() error {
 		}
 	}()
 
-	go storeMetricsIfNeeded(flagStoreInterval, flagFileStoragePath, memStorage)
+	go storeMetricsIfNeeded(flagStoreInterval, flagFileStoragePath, store)
 
 	logger.Log.Infoln("Running server on", flagRunAddr)
 	if err := http.ListenAndServe(flagRunAddr, router); err != nil {
@@ -69,11 +58,34 @@ func run() error {
 	return nil
 }
 
-func shutDown(filename string, store *storage.MemStorage) error {
+func shutDown(filename string, store storage.Storage) error {
 	return storage.SaveToFile(filename, store)
 }
 
-func storeMetricsIfNeeded(flagStoreInterval int, filename string, store *storage.MemStorage) {
+func initStorage() (store storage.Storage) {
+	if flagDatabaseDSN != "" {
+		logger.Log.Infoln("Initializing postgres database storage")
+		return storage.NewPostgresStorage()
+	}
+	if flagFileStoragePath != "" {
+		if flagRestore {
+			logger.Log.Infoln("Initializing file storage from file", flagFileStoragePath)
+			store, err := storage.InitFromFile(flagStoreInterval == 0, flagFileStoragePath)
+			if err != nil {
+				logger.Log.Error("Can not load storage from file.", err.Error())
+				store = storage.NewFileStorage(flagStoreInterval == 0, flagFileStoragePath)
+			}
+			return store
+		} else {
+			logger.Log.Infoln("Initializing file storage with new file", flagFileStoragePath)
+			return storage.NewFileStorage(flagStoreInterval == 0, flagFileStoragePath)
+		}
+	}
+	logger.Log.Infoln("Initializing memory storage")
+	return storage.NewMemStorage()
+}
+
+func storeMetricsIfNeeded(flagStoreInterval int, filename string, store storage.Storage) {
 	if flagStoreInterval != 0 {
 		count := 1
 		for {
