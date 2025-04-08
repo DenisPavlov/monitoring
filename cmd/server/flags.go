@@ -21,9 +21,9 @@ func parseFlags() error {
 	flag.StringVar(&flagLogLevel, "l", "Info", "log level")
 	flag.StringVar(&flagRunEnv, "e", "production", "Run environment")
 	flag.IntVar(&flagStoreInterval, "i", 300, "File store interval in seconds")
-	flag.StringVar(&flagFileStoragePath, "f", "storage.json", "Storage file path")
+	flag.StringVar(&flagFileStoragePath, "f", "", "Storage file path")
 	flag.BoolVar(&flagRestore, "r", false, "Load storage data from file")
-	flag.StringVar(&flagDatabaseDSN, "d", "host=localhost user=postgres password=postgres dbname=examples sslmode=disable", "Database DSN")
+	flag.StringVar(&flagDatabaseDSN, "d", "", "Database DSN")
 	flag.Parse()
 
 	if envRunAddr := os.Getenv("ADDRESS"); envRunAddr != "" {

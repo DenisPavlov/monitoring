@@ -35,24 +35,24 @@ func InitFromFile(needToSaveSync bool, filename string) (*FileStorage, error) {
 	return storage, nil
 }
 
-func SaveToFile(fName string, storage interface{}) error {
-	data, err := json.MarshalIndent(storage, "", "   ")
+func (s *FileStorage) SaveToFile() error {
+	data, err := json.MarshalIndent(s, "", "   ")
 	if err != nil {
 		logger.Log.Error("cannot create byte data from storage", err)
 		return err
 	}
-	err = os.WriteFile(fName, data, 0666)
+	err = os.WriteFile(s.filename, data, 0666)
 	if err != nil {
 		logger.Log.Error("cannot save to file", err)
 		return err
 	}
-	return os.WriteFile(fName, data, 0666)
+	return os.WriteFile(s.filename, data, 0666)
 }
 
 func (s *FileStorage) AddGauge(name string, value float64) error {
 	s.Gauges[name] = value
 	if s.needToSaveSync {
-		err := SaveToFile(s.filename, s)
+		err := s.SaveToFile()
 		if err != nil {
 			return err
 		}
@@ -63,7 +63,7 @@ func (s *FileStorage) AddGauge(name string, value float64) error {
 func (s *FileStorage) AddCounter(name string, value int64) error {
 	s.Counters[name] = s.Counters[name] + value
 	if s.needToSaveSync {
-		err := SaveToFile(s.filename, s)
+		err := s.SaveToFile()
 		if err != nil {
 			return err
 		}
