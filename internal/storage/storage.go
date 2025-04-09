@@ -1,10 +1,13 @@
 package storage
 
+import (
+	"context"
+	"github.com/DenisPavlov/monitoring/internal/models"
+)
+
 type Storage interface {
-	AddGauge(name string, value float64) error
-	AddCounter(name string, value int64) error
-	Gauge(name string) (float64, bool)
-	Counter(name string) (int64, bool)
-	AllGauges() map[string]float64
-	AllCounters() map[string]int64
+	Save(ctx context.Context, metric *models.Metrics) error
+	SaveAll(ctx context.Context, metrics []models.Metrics) error
+	GetByTypeAndID(ctx context.Context, ID string, mType string) (models.Metrics, error)
+	GetAllByType(ctx context.Context, mType string) ([]models.Metrics, error)
 }

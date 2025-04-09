@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"github.com/DenisPavlov/monitoring/internal/logger"
 	"github.com/DenisPavlov/monitoring/internal/models"
-	"github.com/DenisPavlov/monitoring/internal/service"
 	"github.com/DenisPavlov/monitoring/internal/storage"
 	"github.com/go-chi/chi/v5"
 	"net/http"
+	"reflect"
 	"strconv"
 	"time"
 )
@@ -20,6 +20,7 @@ const (
 	getBasePath    = "/value"
 )
 
+// todo -попробовать выпилить db
 func BuildRouter(storage storage.Storage, db *sql.DB) chi.Router {
 	r := chi.NewRouter()
 	r.Use(logger.RequestLogger)
@@ -33,7 +34,9 @@ func BuildRouter(storage storage.Storage, db *sql.DB) chi.Router {
 		r.Get("/{mType}/{mName}", getMetricHandler(storage))
 	})
 	r.Get("/ping", pingDBHandler(db))
+	r.Post("/updates", func(writer http.ResponseWriter, request *http.Request) {
 
+	})
 	r.Get("/", getAllMetricsHandler(storage))
 	return r
 }
@@ -57,14 +60,14 @@ func saveMetricsHandler(storage storage.Storage) http.HandlerFunc {
 		mName := chi.URLParam(r, "mName")
 		mValue := chi.URLParam(r, "mValue")
 
-		req, err := metrics.CreateMetrics(mName, mType, mValue)
+		req, err := models.CreateMetrics(mName, mType, mValue)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			logger.Log.Errorf("Error creating metrics: %s", err.Error())
 			return
 		}
 
-		if err = metrics.Save(req, storage); err != nil {
+		if err = storage.Save(r.Context(), req); err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
@@ -76,8 +79,12 @@ func getMetricHandler(storage storage.Storage) http.HandlerFunc {
 		mType := chi.URLParam(r, "mType")
 		mName := chi.URLParam(r, "mName")
 
-		res := metrics.Get(mName, mType, storage)
-		if res == nil {
+		res, err := storage.GetByTypeAndID(r.Context(), mName, mType)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		if (reflect.DeepEqual(res, models.Metrics{})) {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
@@ -108,8 +115,12 @@ func getJSONMetricHandler(storage storage.Storage) http.HandlerFunc {
 			return
 		}
 
-		res := metrics.Get(req.ID, req.MType, storage)
-		if res == nil {
+		res, err := storage.GetByTypeAndID(r.Context(), req.ID, req.MType)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		if (reflect.DeepEqual(res, models.Metrics{})) {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
@@ -127,14 +138,20 @@ func getAllMetricsHandler(storage storage.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		page := "<!DOCTYPE html><html><body>"
 
-		gauges := storage.AllGauges()
-		for key, value := range gauges {
-			page += fmt.Sprintf("\n<p>%s - %f</p>", key, value)
+		gauges, err := storage.GetAllByType(r.Context(), models.GaugeMetricName)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+		for _, value := range gauges {
+			page += fmt.Sprintf("\n<p>%s - %f</p>", value.ID, *value.Value)
 		}
 
-		counters := storage.AllCounters()
-		for key, value := range counters {
-			page += fmt.Sprintf("\n<p>%s - %d</p>", key, value)
+		counters, err := storage.GetAllByType(r.Context(), models.CounterMetricName)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+		for _, value := range counters {
+			page += fmt.Sprintf("\n<p>%s - %d</p>", value.ID, *value.Delta)
 		}
 
 		page += "\n</body></html>"
@@ -154,7 +171,7 @@ func updateMetricHandler(storage storage.Storage) http.HandlerFunc {
 			return
 		}
 
-		if err := metrics.Save(&req, storage); err != nil {
+		if err := storage.Save(r.Context(), &req); err != nil {
 			logger.Log.Error("cannot save request data to storage ", err)
 			w.WriteHeader(http.StatusBadRequest)
 			return
