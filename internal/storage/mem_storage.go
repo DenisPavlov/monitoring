@@ -43,17 +43,6 @@ func (s MemStorage) Save(ctx context.Context, metric *models.Metrics) error {
 	}
 }
 
-/*
-//		if metrics.Delta == nil {
-//			return ErrWrongValue
-//		}
-//		if err := storage.AddCounter(metrics.ID, *metrics.Delta); err != nil {
-//			return err
-//		}
-//		updatedValue, _ := storage.Counter(metrics.ID)
-//		*metrics.Delta = updatedValue
-*/
-
 func (s MemStorage) SaveAll(ctx context.Context, metrics []models.Metrics) error {
 	select {
 	case <-ctx.Done():
