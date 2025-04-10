@@ -27,39 +27,37 @@ func NewPostgresStorage(ctx context.Context, db *sql.DB) (*PostgresStorage, erro
 }
 
 func (s *PostgresStorage) Save(ctx context.Context, metric *models.Metrics) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	err = saveOne(ctx, metric, tx)
+	if err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func saveOne(ctx context.Context, metric *models.Metrics, tx *sql.Tx) error {
 	switch metric.MType {
 	case models.GaugeMetricName:
-		_, err := s.db.ExecContext(ctx, `INSERT INTO metrics (id, type, value) VALUES ($1, $2, $3) ON CONFLICT (id, type) DO UPDATE SET value = $3`, metric.ID, metric.MType, metric.Value)
+		_, err := tx.ExecContext(ctx, `INSERT INTO metrics (id, type, value) VALUES ($1, $2, $3) ON CONFLICT (id, type) DO UPDATE SET value = $3`, metric.ID, metric.MType, metric.Value)
 		if err != nil {
 			return err
 		}
 	case models.CounterMetricName:
-		tx, err := s.db.Begin()
-		if err != nil {
-			return err
-		}
 		row := tx.QueryRowContext(ctx, `SELECT delta FROM metrics WHERE id = $1 AND type = $2 FOR UPDATE`, metric.ID, metric.MType)
 
 		var currentDelta int64
-		err = row.Scan(&currentDelta)
+		err := row.Scan(&currentDelta)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
-			rollbackErr := tx.Rollback()
-			if rollbackErr != nil {
-				return rollbackErr
-			}
 			return err
 		}
 
 		*metric.Delta = *metric.Delta + currentDelta
 		_, err = tx.ExecContext(ctx, `INSERT INTO metrics (id, type, delta) VALUES ($1, $2, $3) ON CONFLICT (id, type) DO UPDATE SET delta = $3`, metric.ID, metric.MType, metric.Delta)
-		if err != nil {
-			rollbackErr := tx.Rollback()
-			if rollbackErr != nil {
-				return rollbackErr
-			}
-			return err
-		}
-		err = tx.Commit()
 		if err != nil {
 			return err
 		}
@@ -67,15 +65,20 @@ func (s *PostgresStorage) Save(ctx context.Context, metric *models.Metrics) erro
 	return nil
 }
 
-// todo - улучшить производительность
 func (s *PostgresStorage) SaveAll(ctx context.Context, metrics []models.Metrics) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
 	for _, metric := range metrics {
-		err := s.Save(ctx, &metric)
+		err := saveOne(ctx, &metric, tx)
 		if err != nil {
 			return err
 		}
 	}
-	return nil
+	return tx.Commit()
 }
 
 func (s *PostgresStorage) GetByTypeAndID(ctx context.Context, ID string, mType string) (metric models.Metrics, err error) {

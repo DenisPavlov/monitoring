@@ -20,7 +20,7 @@ const (
 	getBasePath    = "/value"
 )
 
-// todo -попробовать выпилить db
+// todo - попробовать выпилить db
 func BuildRouter(storage storage.Storage, db *sql.DB) chi.Router {
 	r := chi.NewRouter()
 	r.Use(logger.RequestLogger)
@@ -34,9 +34,7 @@ func BuildRouter(storage storage.Storage, db *sql.DB) chi.Router {
 		r.Get("/{mType}/{mName}", getMetricHandler(storage))
 	})
 	r.Get("/ping", pingDBHandler(db))
-	r.Post("/updates", func(writer http.ResponseWriter, request *http.Request) {
-
-	})
+	r.Post("/updates/", updatesHandler(storage))
 	r.Get("/", getAllMetricsHandler(storage))
 	return r
 }
@@ -131,6 +129,21 @@ func getJSONMetricHandler(storage storage.Storage) http.HandlerFunc {
 			w.WriteHeader(http.StatusInternalServerError)
 			logger.Log.Error("cannot encode metric JSON body", err)
 			return
+		}
+	}
+}
+
+func updatesHandler(storage storage.Storage) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req []models.Metrics
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			logger.Log.Error("cannot decode request JSON body", err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		if err := storage.SaveAll(r.Context(), req); err != nil {
+			logger.Log.Error("cannot save metrics to storage", err)
+			w.WriteHeader(http.StatusInternalServerError)
 		}
 	}
 }

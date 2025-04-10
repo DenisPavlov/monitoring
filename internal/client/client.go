@@ -8,7 +8,7 @@ import (
 	"net/http"
 )
 
-func postMetric(host string, metrics models.Metrics) error {
+func postMetric(host string, metrics []models.Metrics) error {
 
 	var buffer bytes.Buffer
 	gzipWriter := gzip.NewWriter(&buffer)
@@ -21,7 +21,7 @@ func postMetric(host string, metrics models.Metrics) error {
 		return err
 	}
 
-	req, err := http.NewRequest("POST", "http://"+host+"/update", &buffer)
+	req, err := http.NewRequest("POST", "http://"+host+"/updates/", &buffer)
 	if err != nil {
 		return err
 	}
@@ -41,29 +41,28 @@ func postMetric(host string, metrics models.Metrics) error {
 }
 
 func PostMetrics(host string, counts map[string]int64, gauges map[string]float64) error {
+
+	var metrics []models.Metrics
 	for name, value := range gauges {
-		metrics := models.Metrics{
+		metric := models.Metrics{
 			ID:    name,
 			MType: "gauge",
 			Value: &value,
 		}
-
-		err := postMetric(host, metrics)
-		if err != nil {
-			return err
-		}
+		metrics = append(metrics, metric)
 	}
 
 	for name, value := range counts {
-		metrics := models.Metrics{
+		metric := models.Metrics{
 			ID:    name,
 			MType: "counter",
 			Delta: &value,
 		}
-		err := postMetric(host, metrics)
-		if err != nil {
-			return err
-		}
+		metrics = append(metrics, metric)
+	}
+	err := postMetric(host, metrics)
+	if err != nil {
+		return err
 	}
 	return nil
 }
