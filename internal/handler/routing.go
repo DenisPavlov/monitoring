@@ -68,6 +68,7 @@ func saveMetricsHandler(storage storage.Storage) http.HandlerFunc {
 		}
 
 		if err = storage.Save(r.Context(), req); err != nil {
+			logger.Log.Errorf("Error creating metrics: %s", err.Error())
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}

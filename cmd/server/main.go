@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"github.com/DenisPavlov/monitoring/internal/database"
 	"github.com/DenisPavlov/monitoring/internal/handler"
@@ -66,15 +67,14 @@ func run() error {
 }
 
 func initStorage(db *sql.DB) (store storage.Storage, err error) {
-	logger.Log.Info("Initializing storage", db) // todo - удалить эту строчку
-	//if flagDatabaseDSN != "" {
-	//	logger.Log.Infoln("Initializing postgres database storage")
-	//	store, err := storage.NewPostgresStorage(context.Background(), db)
-	//	if err != nil {
-	//		return nil, err
-	//	}
-	//	return store, nil
-	//}
+	if flagDatabaseDSN != "" {
+		logger.Log.Infoln("Initializing postgres database storage")
+		store, err := storage.NewPostgresStorage(context.Background(), db)
+		if err != nil {
+			return nil, err
+		}
+		return store, nil
+	}
 	if flagFileStoragePath != "" {
 		var fileStorage *storage.FileStorage
 		var err error
