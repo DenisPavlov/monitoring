@@ -9,15 +9,19 @@ import (
 )
 
 func main() {
-	parseFlags()
+	if err := parseFlags(); err != nil {
+		log.Fatal(err)
+	}
 	if err := run(); err != nil {
 		log.Fatal(err)
 	}
 }
 
 func run() error {
-	counts := make(map[string]int64)
-	var gauges map[string]float64
+	var (
+		counts = make(map[string]int64)
+		gauges map[string]float64
+	)
 	count := 1
 
 	for {

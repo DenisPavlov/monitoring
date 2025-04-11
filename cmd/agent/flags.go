@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"log"
 	"os"
 	"strconv"
 )
@@ -11,7 +10,7 @@ var flagRunAddr string
 var flagReportInterval int
 var flagPollInterval int
 
-func parseFlags() {
+func parseFlags() error {
 	flag.StringVar(&flagRunAddr, "a", "localhost:8080", "server address and port")
 	flag.IntVar(&flagReportInterval, "r", 10, "frequency of sending metrics to the server in seconds")
 	flag.IntVar(&flagPollInterval, "p", 2, "frequency of getting runtime metrics in seconds")
@@ -23,15 +22,16 @@ func parseFlags() {
 	if envReportInterval := os.Getenv("REPORT_INTERVAL"); envReportInterval != "" {
 		val, err := strconv.Atoi(envReportInterval)
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
 		flagReportInterval = val
 	}
 	if envPollInterval := os.Getenv("POLL_INTERVAL"); envPollInterval != "" {
 		val, err := strconv.Atoi(envPollInterval)
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
 		flagPollInterval = val
 	}
+	return nil
 }

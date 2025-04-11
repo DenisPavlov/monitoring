@@ -58,7 +58,7 @@ func (s MemStorage) SaveAll(ctx context.Context, metrics []models.Metrics) error
 	}
 }
 
-func (s MemStorage) GetByTypeAndID(ctx context.Context, ID string, mType string) (res models.Metrics, err error) {
+func (s MemStorage) GetByTypeAndID(ctx context.Context, ID, mType string) (res models.Metrics, err error) {
 	select {
 	case <-ctx.Done():
 		return res, ctx.Err()

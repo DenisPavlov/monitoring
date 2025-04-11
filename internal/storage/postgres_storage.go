@@ -81,7 +81,7 @@ func (s *PostgresStorage) SaveAll(ctx context.Context, metrics []models.Metrics)
 	return tx.Commit()
 }
 
-func (s *PostgresStorage) GetByTypeAndID(ctx context.Context, ID string, mType string) (metric models.Metrics, err error) {
+func (s *PostgresStorage) GetByTypeAndID(ctx context.Context, ID, mType string) (metric models.Metrics, err error) {
 	row := s.db.QueryRowContext(ctx, `SELECT id, type, delta, value FROM metrics WHERE id = $1 AND type = $2`, ID, mType)
 	if err = row.Scan(&metric.ID, &metric.MType, &metric.Delta, &metric.Value); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

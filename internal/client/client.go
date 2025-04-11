@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
+	"github.com/DenisPavlov/monitoring/internal/logger"
 	"github.com/DenisPavlov/monitoring/internal/models"
+	"math"
 	"net/http"
+	"time"
 )
 
 func postMetric(host string, metrics []models.Metrics) error {
@@ -29,13 +32,23 @@ func postMetric(host string, metrics []models.Metrics) error {
 	req.Header.Set("Content-Encoding", "gzip")
 	req.Header.Set("Accept-Encoding", "gzip")
 
-	resp, err := http.DefaultClient.Do(req)
+	retries := 4
+	var resp *http.Response
 
-	if err != nil {
-		return err
-	}
-	if err := resp.Body.Close(); err != nil {
-		return err
+	for i := 0; i < retries; i++ {
+		logger.Log.Infof("Posting metrics to %s with attention %d", host, i)
+		resp, err = http.DefaultClient.Do(req)
+		if err != nil {
+			return err
+		}
+		if shouldRetry(resp) {
+			time.Sleep(backoff(i))
+		} else {
+			if err := resp.Body.Close(); err != nil {
+				return err
+			}
+			return nil
+		}
 	}
 	return nil
 }
@@ -65,4 +78,17 @@ func PostMetrics(host string, counts map[string]int64, gauges map[string]float64
 		return err
 	}
 	return nil
+}
+
+func shouldRetry(resp *http.Response) bool {
+	if resp.StatusCode == http.StatusBadGateway ||
+		resp.StatusCode == http.StatusServiceUnavailable ||
+		resp.StatusCode == http.StatusGatewayTimeout {
+		return true
+	}
+	return false
+}
+
+func backoff(retries int) time.Duration {
+	return time.Duration(math.Pow(2, float64(retries))) * time.Second
 }
