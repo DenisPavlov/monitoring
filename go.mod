@@ -7,6 +7,7 @@ toolchain go1.23.7
 require (
 	github.com/go-chi/chi/v5 v5.2.1
 	github.com/go-resty/resty/v2 v2.16.5
+	github.com/jackc/pgerrcode v0.0.0-20240316143900-6e2875d9b438
 	github.com/jackc/pgx/v5 v5.7.4
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.10.0

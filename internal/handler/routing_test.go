@@ -81,10 +81,10 @@ func TestGet(t *testing.T) {
 	var storage = storage2.NewMemStorage()
 
 	gValue := 1.001
-	_ = storage.Save(ctx, &models.Metrics{ID: "g1", MType: models.GaugeMetricName, Value: &gValue})
+	_ = storage.Save(ctx, &models.Metric{ID: "g1", MType: models.GaugeMetricName, Value: &gValue})
 
 	cValue := int64(2)
-	_ = storage.Save(ctx, &models.Metrics{ID: "c1", MType: models.CounterMetricName, Delta: &cValue})
+	_ = storage.Save(ctx, &models.Metric{ID: "c1", MType: models.CounterMetricName, Delta: &cValue})
 
 	srv := httptest.NewServer(BuildRouter(storage, nil)) // todo -использовать мок
 	defer srv.Close()

@@ -16,7 +16,7 @@ func TestMemStorage_Add(t *testing.T) {
 	ctx := context.Background()
 	s := NewMemStorage()
 	value1 := int64(1)
-	m := models.Metrics{
+	m := models.Metric{
 		ID:    "m1",
 		MType: "counter",
 		Delta: &value1,

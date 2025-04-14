@@ -5,42 +5,53 @@ import (
 	"database/sql"
 	"errors"
 	"github.com/DenisPavlov/monitoring/internal/models"
+	"github.com/DenisPavlov/monitoring/internal/util"
+	"time"
+
+	"github.com/jackc/pgerrcode"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
-type PostgresStorage struct {
+const attempts = 4
+
+type PostgresMetricsStorage struct {
 	db *sql.DB
 }
 
-func NewPostgresStorage(ctx context.Context, db *sql.DB) (*PostgresStorage, error) {
-	_, err := db.ExecContext(ctx, `
+func NewPostgresStorage(ctx context.Context, db *sql.DB) (*PostgresMetricsStorage, error) {
+	return queryWithRetries(func() (*PostgresMetricsStorage, error) {
+		_, err := db.ExecContext(ctx, `
 		CREATE TABLE IF NOT EXISTS metrics (
 		    id TEXT,
 		    type TEXT,
 		    delta BIGINT,
 		    value DOUBLE PRECISION,
 		    PRIMARY KEY (id, type))`,
-	)
-	if err != nil {
-		return nil, err
-	}
-	return &PostgresStorage{db: db}, nil
+		)
+		if err != nil {
+			return nil, err
+		}
+		return &PostgresMetricsStorage{db: db}, nil
+	})
 }
 
-func (s *PostgresStorage) Save(ctx context.Context, metric *models.Metrics) error {
-	tx, err := s.db.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
+func (s *PostgresMetricsStorage) Save(ctx context.Context, metric *models.Metric) error {
+	return execWithRetries(func() error {
+		tx, err := s.db.Begin()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
 
-	err = saveOne(ctx, metric, tx)
-	if err != nil {
-		return err
-	}
-	return tx.Commit()
+		err = saveOne(ctx, metric, tx)
+		if err != nil {
+			return err
+		}
+		return tx.Commit()
+	})
 }
 
-func saveOne(ctx context.Context, metric *models.Metrics, tx *sql.Tx) error {
+func saveOne(ctx context.Context, metric *models.Metric, tx *sql.Tx) error {
 	switch metric.MType {
 	case models.GaugeMetricName:
 		_, err := tx.ExecContext(ctx, `INSERT INTO metrics (id, type, value) VALUES ($1, $2, $3) ON CONFLICT (id, type) DO UPDATE SET value = $3`, metric.ID, metric.MType, metric.Value)
@@ -48,16 +59,12 @@ func saveOne(ctx context.Context, metric *models.Metrics, tx *sql.Tx) error {
 			return err
 		}
 	case models.CounterMetricName:
-		row := tx.QueryRowContext(ctx, `SELECT delta FROM metrics WHERE id = $1 AND type = $2 FOR UPDATE`, metric.ID, metric.MType)
-
-		var currentDelta int64
-		err := row.Scan(&currentDelta)
-		if err != nil && !errors.Is(err, sql.ErrNoRows) {
-			return err
-		}
-
-		*metric.Delta = *metric.Delta + currentDelta
-		_, err = tx.ExecContext(ctx, `INSERT INTO metrics (id, type, delta) VALUES ($1, $2, $3) ON CONFLICT (id, type) DO UPDATE SET delta = $3`, metric.ID, metric.MType, metric.Delta)
+		_, err := tx.ExecContext(ctx, `
+			INSERT INTO metrics (id, type, delta)
+			VALUES ($1, $2, $3)
+			ON CONFLICT (id, type) DO UPDATE
+			SET delta = metrics.delta + EXCLUDED.delta
+		`, metric.ID, metric.MType, metric.Delta)
 		if err != nil {
 			return err
 		}
@@ -65,50 +72,94 @@ func saveOne(ctx context.Context, metric *models.Metrics, tx *sql.Tx) error {
 	return nil
 }
 
-func (s *PostgresStorage) SaveAll(ctx context.Context, metrics []models.Metrics) error {
-	tx, err := s.db.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	for _, metric := range metrics {
-		err := saveOne(ctx, &metric, tx)
+func (s *PostgresMetricsStorage) SaveAll(ctx context.Context, metrics []models.Metric) error {
+	return execWithRetries(func() error {
+		tx, err := s.db.Begin()
 		if err != nil {
 			return err
 		}
-	}
-	return tx.Commit()
-}
+		defer tx.Rollback()
 
-func (s *PostgresStorage) GetByTypeAndID(ctx context.Context, ID, mType string) (metric models.Metrics, err error) {
-	row := s.db.QueryRowContext(ctx, `SELECT id, type, delta, value FROM metrics WHERE id = $1 AND type = $2`, ID, mType)
-	if err = row.Scan(&metric.ID, &metric.MType, &metric.Delta, &metric.Value); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return metric, nil
+		for _, metric := range metrics {
+			err := saveOne(ctx, &metric, tx)
+			if err != nil {
+				return err
+			}
 		}
-		return metric, err
-	}
-	return metric, nil
+		return tx.Commit()
+	})
 }
 
-func (s *PostgresStorage) GetAllByType(ctx context.Context, mType string) ([]models.Metrics, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT id, type, delta, value FROM metrics WHERE type = $1`, mType)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
+func (s *PostgresMetricsStorage) GetByTypeAndID(ctx context.Context, ID, mType string) (metric models.Metric, err error) {
+	return queryWithRetries(func() (models.Metric, error) {
+		row := s.db.QueryRowContext(ctx, `SELECT id, type, delta, value FROM metrics WHERE id = $1 AND type = $2`, ID, mType)
+		if err = row.Scan(&metric.ID, &metric.MType, &metric.Delta, &metric.Value); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return metric, nil
+			}
+			return metric, err
+		}
+		return metric, nil
+	})
+}
 
-	metrics := make([]models.Metrics, 0)
-	for rows.Next() {
-		var metric models.Metrics
-		if err := rows.Scan(&metric.ID, &metric.MType, metric.Delta, metric.Value); err != nil {
+func (s *PostgresMetricsStorage) GetAllByType(ctx context.Context, mType string) ([]models.Metric, error) {
+	return queryWithRetries(func() ([]models.Metric, error) {
+		rows, err := s.db.QueryContext(ctx, `SELECT id, type, delta, value FROM metrics WHERE type = $1`, mType)
+		if err != nil {
 			return nil, err
 		}
-		metrics = append(metrics, metric)
+		defer rows.Close()
+
+		metrics := make([]models.Metric, 0)
+		for rows.Next() {
+			var metric models.Metric
+			if err := rows.Scan(&metric.ID, &metric.MType, metric.Delta, metric.Value); err != nil {
+				return nil, err
+			}
+			metrics = append(metrics, metric)
+		}
+		if err := rows.Err(); err != nil {
+			return nil, err
+		}
+		return metrics, nil
+	})
+}
+
+func shouldRetry(err error) bool {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		if pgErr.Code == pgerrcode.ConnectionException ||
+			pgErr.Code == pgerrcode.ConnectionDoesNotExist ||
+			pgErr.Code == pgerrcode.ConnectionFailure ||
+			pgErr.Code == pgerrcode.SQLClientUnableToEstablishSQLConnection {
+			return true
+		}
 	}
-	if err := rows.Err(); err != nil {
-		return nil, err
+
+	return false
+}
+
+func queryWithRetries[T any](action func() (T, error)) (result T, err error) {
+	for i := 0; i < attempts; i++ {
+		result, err := action()
+		if shouldRetry(err) {
+			time.Sleep(util.Backoff(i))
+		} else {
+			return result, err
+		}
 	}
-	return metrics, nil
+	return result, err
+}
+
+func execWithRetries(action func() error) (err error) {
+	for i := 0; i < attempts; i++ {
+		err := action()
+		if shouldRetry(err) {
+			time.Sleep(util.Backoff(i))
+		} else {
+			return err
+		}
+	}
+	return err
 }

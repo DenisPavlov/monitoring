@@ -19,19 +19,19 @@ func main() {
 
 func run() error {
 	var (
-		counts = make(map[string]int64)
-		gauges map[string]float64
+		counter = make(map[string]int64)
+		gauges  map[string]float64
 	)
 	count := 1
 
 	for {
 		if count%flagPollInterval == 0 {
 			gauges = metrics.Gauge()
-			counts = metrics.Count(counts)
+			counter = metrics.Count(counter)
 		}
 
 		if count%flagReportInterval == 0 {
-			if err := client.PostMetrics(flagRunAddr, counts, gauges); err != nil {
+			if err := client.PostMetrics(flagRunAddr, counter, gauges); err != nil {
 				logger.Log.Error(err)
 			}
 		}

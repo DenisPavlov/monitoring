@@ -5,19 +5,21 @@ import (
 	"errors"
 	"github.com/DenisPavlov/monitoring/internal/models"
 	"reflect"
+	"sync"
 )
 
-type MemStorage struct {
-	metrics map[string]models.Metrics
+type MemoryMetricsStorage struct {
+	mu      sync.Mutex
+	metrics map[string]models.Metric
 }
 
-func NewMemStorage() *MemStorage {
-	return &MemStorage{
-		metrics: make(map[string]models.Metrics),
+func NewMemStorage() *MemoryMetricsStorage {
+	return &MemoryMetricsStorage{
+		metrics: make(map[string]models.Metric),
 	}
 }
 
-func (s MemStorage) Save(ctx context.Context, metric *models.Metrics) error {
+func (s *MemoryMetricsStorage) Save(ctx context.Context, metric *models.Metric) error {
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
@@ -26,6 +28,8 @@ func (s MemStorage) Save(ctx context.Context, metric *models.Metrics) error {
 		if err != nil {
 			return err
 		}
+		s.mu.Lock()
+		defer s.mu.Unlock()
 		switch metric.MType {
 		case models.GaugeMetricName:
 			s.metrics[key] = *metric
@@ -34,7 +38,7 @@ func (s MemStorage) Save(ctx context.Context, metric *models.Metrics) error {
 			if err != nil {
 				return err
 			}
-			if !reflect.DeepEqual(m, models.Metrics{}) {
+			if !reflect.DeepEqual(m, models.Metric{}) {
 				*metric.Delta = *metric.Delta + *m.Delta
 			}
 			s.metrics[key] = *metric
@@ -43,7 +47,7 @@ func (s MemStorage) Save(ctx context.Context, metric *models.Metrics) error {
 	}
 }
 
-func (s MemStorage) SaveAll(ctx context.Context, metrics []models.Metrics) error {
+func (s *MemoryMetricsStorage) SaveAll(ctx context.Context, metrics []models.Metric) error {
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
@@ -58,19 +62,19 @@ func (s MemStorage) SaveAll(ctx context.Context, metrics []models.Metrics) error
 	}
 }
 
-func (s MemStorage) GetByTypeAndID(ctx context.Context, ID, mType string) (res models.Metrics, err error) {
+func (s *MemoryMetricsStorage) GetByTypeAndID(ctx context.Context, ID, mType string) (res models.Metric, err error) {
 	select {
 	case <-ctx.Done():
 		return res, ctx.Err()
 	default:
-		key, err := key(models.Metrics{ID: ID, MType: mType})
+		key, err := key(models.Metric{ID: ID, MType: mType})
 		if err != nil {
 			return res, err
 		}
 		return s.metrics[key], nil
 	}
 }
-func (s MemStorage) GetAllByType(ctx context.Context, mType string) (res []models.Metrics, err error) {
+func (s *MemoryMetricsStorage) GetAllByType(ctx context.Context, mType string) (res []models.Metric, err error) {
 	select {
 	case <-ctx.Done():
 		return res, ctx.Err()
@@ -84,7 +88,7 @@ func (s MemStorage) GetAllByType(ctx context.Context, mType string) (res []model
 	}
 }
 
-func key(m models.Metrics) (string, error) {
+func key(m models.Metric) (string, error) {
 	if m.ID == "" || m.MType == "" {
 		return "", errors.New("invalid metrics, ID or MType is empty")
 	}

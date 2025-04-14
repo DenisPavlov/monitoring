@@ -6,12 +6,12 @@ import (
 	"encoding/json"
 	"github.com/DenisPavlov/monitoring/internal/logger"
 	"github.com/DenisPavlov/monitoring/internal/models"
-	"math"
+	"github.com/DenisPavlov/monitoring/internal/util"
 	"net/http"
 	"time"
 )
 
-func postMetric(host string, metrics []models.Metrics) error {
+func postMetric(host string, metrics []models.Metric) error {
 
 	var buffer bytes.Buffer
 	gzipWriter := gzip.NewWriter(&buffer)
@@ -42,7 +42,7 @@ func postMetric(host string, metrics []models.Metrics) error {
 			return err
 		}
 		if shouldRetry(resp) {
-			time.Sleep(backoff(i))
+			time.Sleep(util.Backoff(i))
 		} else {
 			if err := resp.Body.Close(); err != nil {
 				return err
@@ -53,11 +53,11 @@ func postMetric(host string, metrics []models.Metrics) error {
 	return nil
 }
 
-func PostMetrics(host string, counts map[string]int64, gauges map[string]float64) error {
+func PostMetrics(host string, counters map[string]int64, gauges map[string]float64) error {
 
-	var metrics []models.Metrics
+	var metrics []models.Metric
 	for name, value := range gauges {
-		metric := models.Metrics{
+		metric := models.Metric{
 			ID:    name,
 			MType: "gauge",
 			Value: &value,
@@ -65,8 +65,8 @@ func PostMetrics(host string, counts map[string]int64, gauges map[string]float64
 		metrics = append(metrics, metric)
 	}
 
-	for name, value := range counts {
-		metric := models.Metrics{
+	for name, value := range counters {
+		metric := models.Metric{
 			ID:    name,
 			MType: "counter",
 			Delta: &value,
@@ -87,8 +87,4 @@ func shouldRetry(resp *http.Response) bool {
 		return true
 	}
 	return false
-}
-
-func backoff(retries int) time.Duration {
-	return time.Duration(math.Pow(2, float64(retries))) * time.Second
 }

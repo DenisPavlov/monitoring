@@ -21,7 +21,7 @@ const (
 )
 
 // todo - попробовать выпилить db
-func BuildRouter(storage storage.Storage, db *sql.DB) chi.Router {
+func BuildRouter(storage storage.MetricsStorage, db *sql.DB) chi.Router {
 	r := chi.NewRouter()
 	r.Use(logger.RequestLogger)
 	r.Use(GzipMiddleware)
@@ -47,18 +47,19 @@ func pingDBHandler(db *sql.DB) http.HandlerFunc {
 		if err := db.PingContext(ctx); err != nil {
 			logger.Log.Error("Error pinging database: ", err)
 			w.WriteHeader(http.StatusInternalServerError)
+			return
 		}
 		w.WriteHeader(http.StatusOK)
 	}
 }
 
-func saveMetricsHandler(storage storage.Storage) http.HandlerFunc {
+func saveMetricsHandler(storage storage.MetricsStorage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		mType := chi.URLParam(r, "mType")
 		mName := chi.URLParam(r, "mName")
 		mValue := chi.URLParam(r, "mValue")
 
-		req, err := models.CreateMetrics(mName, mType, mValue)
+		req, err := models.CreateMetric(mName, mType, mValue)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			logger.Log.Errorf("Error creating metrics: %s", err.Error())
@@ -73,7 +74,7 @@ func saveMetricsHandler(storage storage.Storage) http.HandlerFunc {
 	}
 }
 
-func getMetricHandler(storage storage.Storage) http.HandlerFunc {
+func getMetricHandler(storage storage.MetricsStorage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		mType := chi.URLParam(r, "mType")
 		mName := chi.URLParam(r, "mName")
@@ -83,7 +84,7 @@ func getMetricHandler(storage storage.Storage) http.HandlerFunc {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		if (reflect.DeepEqual(res, models.Metrics{})) {
+		if (reflect.DeepEqual(res, models.Metric{})) {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
@@ -104,9 +105,9 @@ func getMetricHandler(storage storage.Storage) http.HandlerFunc {
 	}
 }
 
-func getJSONMetricHandler(storage storage.Storage) http.HandlerFunc {
+func getJSONMetricHandler(storage storage.MetricsStorage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var req models.Metrics
+		var req models.Metric
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			logger.Log.Error("cannot decode request JSON body", err)
@@ -119,7 +120,7 @@ func getJSONMetricHandler(storage storage.Storage) http.HandlerFunc {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		if (reflect.DeepEqual(res, models.Metrics{})) {
+		if (reflect.DeepEqual(res, models.Metric{})) {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
@@ -133,9 +134,9 @@ func getJSONMetricHandler(storage storage.Storage) http.HandlerFunc {
 	}
 }
 
-func updatesHandler(storage storage.Storage) http.HandlerFunc {
+func updatesHandler(storage storage.MetricsStorage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var req []models.Metrics
+		var req []models.Metric
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			logger.Log.Error("cannot decode request JSON body", err)
 			w.WriteHeader(http.StatusBadRequest)
@@ -144,11 +145,12 @@ func updatesHandler(storage storage.Storage) http.HandlerFunc {
 		if err := storage.SaveAll(r.Context(), req); err != nil {
 			logger.Log.Error("cannot save metrics to storage", err)
 			w.WriteHeader(http.StatusInternalServerError)
+			return
 		}
 	}
 }
 
-func getAllMetricsHandler(storage storage.Storage) http.HandlerFunc {
+func getAllMetricsHandler(storage storage.MetricsStorage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		page := "<!DOCTYPE html><html><body>"
 
@@ -175,9 +177,9 @@ func getAllMetricsHandler(storage storage.Storage) http.HandlerFunc {
 	}
 }
 
-func updateMetricHandler(storage storage.Storage) http.HandlerFunc {
+func updateMetricHandler(storage storage.MetricsStorage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var req models.Metrics
+		var req models.Metric
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			logger.Log.Error("cannot decode request JSON body ", err)

@@ -10,15 +10,15 @@ const (
 	CounterMetricName = "counter"
 )
 
-type Metrics struct {
+type Metric struct {
 	ID    string   `json:"id"`              // имя метрики
 	MType string   `json:"type"`            // параметр, принимающий значение gauge или counter
 	Delta *int64   `json:"delta,omitempty"` // значение метрики в случае передачи counter
 	Value *float64 `json:"value,omitempty"` // значение метрики в случае передачи gauge
 }
 
-func CreateMetrics(id string, mType string, mValue string) (*Metrics, error) {
-	var metrics = Metrics{
+func CreateMetric(id string, mType string, mValue string) (*Metric, error) {
+	var metrics = Metric{
 		ID:    id,
 		MType: mType,
 	}

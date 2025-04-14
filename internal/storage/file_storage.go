@@ -8,26 +8,26 @@ import (
 	"os"
 )
 
-type FileStorage struct {
-	*MemStorage
+type FileMetricsStorage struct {
+	*MemoryMetricsStorage
 	needToSaveSync bool
 	filename       string
 }
 
 // jsonMetrics need to safe metrics to json file
 type jsonMetrics struct {
-	Metrics map[string]models.Metrics
+	Metrics map[string]models.Metric
 }
 
-func NewFileStorage(needToSaveSync bool, filename string) *FileStorage {
-	return &FileStorage{
-		MemStorage:     NewMemStorage(),
-		needToSaveSync: needToSaveSync,
-		filename:       filename,
+func NewFileStorage(needToSaveSync bool, filename string) *FileMetricsStorage {
+	return &FileMetricsStorage{
+		MemoryMetricsStorage: NewMemStorage(),
+		needToSaveSync:       needToSaveSync,
+		filename:             filename,
 	}
 }
 
-func InitFromFile(needToSaveSync bool, filename string) (*FileStorage, error) {
+func InitFromFile(needToSaveSync bool, filename string) (*FileMetricsStorage, error) {
 	data, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
@@ -39,15 +39,15 @@ func InitFromFile(needToSaveSync bool, filename string) (*FileStorage, error) {
 		return nil, err
 	}
 
-	storage := FileStorage{
-		MemStorage:     &MemStorage{metrics: jsonMetrics.Metrics},
-		needToSaveSync: needToSaveSync,
-		filename:       filename,
+	storage := FileMetricsStorage{
+		MemoryMetricsStorage: &MemoryMetricsStorage{metrics: jsonMetrics.Metrics},
+		needToSaveSync:       needToSaveSync,
+		filename:             filename,
 	}
 	return &storage, nil
 }
 
-func (s *FileStorage) SaveToFile() error {
+func (s *FileMetricsStorage) SaveToFile() error {
 	data, err := json.MarshalIndent(jsonMetrics{Metrics: s.metrics}, "", "   ")
 	if err != nil {
 		logger.Log.Error("cannot create byte data from storage", err)
@@ -61,12 +61,12 @@ func (s *FileStorage) SaveToFile() error {
 	return os.WriteFile(s.filename, data, 0666)
 }
 
-func (s *FileStorage) Save(ctx context.Context, metric *models.Metrics) error {
+func (s *FileMetricsStorage) Save(ctx context.Context, metric *models.Metric) error {
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
 	default:
-		err := s.MemStorage.Save(ctx, metric)
+		err := s.MemoryMetricsStorage.Save(ctx, metric)
 		if err != nil {
 			return err
 		}
