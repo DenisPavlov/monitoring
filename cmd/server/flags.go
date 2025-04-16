@@ -14,6 +14,7 @@ var (
 	flagFileStoragePath string
 	flagRestore         bool
 	flagDatabaseDSN     string
+	flagKey             string
 )
 
 func parseFlags() error {
@@ -24,6 +25,7 @@ func parseFlags() error {
 	flag.StringVar(&flagFileStoragePath, "f", "", "Storage file path")
 	flag.BoolVar(&flagRestore, "r", false, "Load storage data from file")
 	flag.StringVar(&flagDatabaseDSN, "d", "", "Database DSN")
+	flag.StringVar(&flagKey, "k", "", "key used to check the request sign")
 	flag.Parse()
 
 	if envRunAddr := os.Getenv("ADDRESS"); envRunAddr != "" {
@@ -60,6 +62,10 @@ func parseFlags() error {
 
 	if envDatabaseDSN := os.Getenv("DATABASE_DSN"); envDatabaseDSN != "" {
 		flagDatabaseDSN = envDatabaseDSN
+	}
+
+	if envKey := os.Getenv("KEY"); envKey != "" {
+		flagKey = envKey
 	}
 
 	return nil

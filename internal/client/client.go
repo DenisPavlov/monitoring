@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
+	"github.com/DenisPavlov/monitoring/internal/handler"
 	"github.com/DenisPavlov/monitoring/internal/logger"
 	"github.com/DenisPavlov/monitoring/internal/models"
 	"github.com/DenisPavlov/monitoring/internal/util"
@@ -11,14 +12,19 @@ import (
 	"time"
 )
 
-func postMetric(host string, metrics []models.Metric) error {
+func postMetric(host, signKey string, metrics []models.Metric) error {
 
-	var buffer bytes.Buffer
-	gzipWriter := gzip.NewWriter(&buffer)
-	err := json.NewEncoder(gzipWriter).Encode(metrics)
+	strReqBody, err := json.Marshal(metrics)
 	if err != nil {
 		return err
 	}
+
+	var buffer bytes.Buffer
+	gzipWriter := gzip.NewWriter(&buffer)
+	if _, err := gzipWriter.Write(strReqBody); err != nil {
+		return err
+	}
+
 	err = gzipWriter.Close()
 	if err != nil {
 		return err
@@ -31,6 +37,10 @@ func postMetric(host string, metrics []models.Metric) error {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Content-Encoding", "gzip")
 	req.Header.Set("Accept-Encoding", "gzip")
+
+	if signKey != "" {
+		signRequest(req, strReqBody, signKey)
+	}
 
 	retries := 4
 	var resp *http.Response
@@ -53,7 +63,7 @@ func postMetric(host string, metrics []models.Metric) error {
 	return nil
 }
 
-func PostMetrics(host string, counters map[string]int64, gauges map[string]float64) error {
+func PostMetrics(host, signKey string, counters map[string]int64, gauges map[string]float64) error {
 
 	var metrics []models.Metric
 	for name, value := range gauges {
@@ -73,7 +83,7 @@ func PostMetrics(host string, counters map[string]int64, gauges map[string]float
 		}
 		metrics = append(metrics, metric)
 	}
-	err := postMetric(host, metrics)
+	err := postMetric(host, signKey, metrics)
 	if err != nil {
 		return err
 	}
@@ -87,4 +97,9 @@ func shouldRetry(resp *http.Response) bool {
 		return true
 	}
 	return false
+}
+
+func signRequest(req *http.Request, body []byte, key string) {
+	sign := util.GetHexSHA256(key, body)
+	req.Header.Set(handler.SHA256HeaderName, sign)
 }
