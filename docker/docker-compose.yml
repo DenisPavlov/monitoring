@@ -1,0 +1,13 @@
+services:
+  postgres:
+    image: postgres:14.5-alpine
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_storage:/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    environment:
+      POSTGRES_PASSWORD: postgres
+
+volumes:
+  postgres_storage:

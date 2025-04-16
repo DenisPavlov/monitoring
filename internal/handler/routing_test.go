@@ -1,6 +1,8 @@
-package routing
+package handler
 
 import (
+	"context"
+	"github.com/DenisPavlov/monitoring/internal/models"
 	storage2 "github.com/DenisPavlov/monitoring/internal/storage"
 	"net/http"
 	"net/http/httptest"
@@ -23,8 +25,8 @@ func TestSaveMetrics(t *testing.T) {
 		{method: http.MethodPost, path: updateBasePath + "/counter/m1/aa", expectedCode: http.StatusBadRequest},
 	}
 
-	var storage = storage2.NewMemStorage(false, "")
-	srv := httptest.NewServer(BuildRouter(storage))
+	var storage = storage2.NewMemStorage()
+	srv := httptest.NewServer(BuildRouter(storage, nil)) // todo -использовать мок
 	defer srv.Close()
 
 	for _, tc := range testCases {
@@ -42,8 +44,8 @@ func TestSaveMetrics(t *testing.T) {
 }
 
 func TestGaugeAdd(t *testing.T) {
-	var storage = storage2.NewMemStorage(false, "")
-	srv := httptest.NewServer(BuildRouter(storage))
+	var storage = storage2.NewMemStorage()
+	srv := httptest.NewServer(BuildRouter(storage, nil)) // todo -использовать мок
 	defer srv.Close()
 
 	resp, err := resty.New().R().
@@ -52,14 +54,15 @@ func TestGaugeAdd(t *testing.T) {
 
 	assert.NoError(t, err, "error making HTTP request")
 	assert.Equal(t, http.StatusOK, resp.StatusCode())
-	val, ok := storage.Gauge("m1")
-	assert.True(t, ok)
-	assert.Equal(t, val, 1.01)
+
+	val, err := storage.GetByTypeAndID(context.Background(), "m1", models.GaugeMetricName)
+	assert.NoError(t, err)
+	assert.Equal(t, *val.Value, 1.01)
 }
 
 func TestCounterAdd(t *testing.T) {
-	var storage = storage2.NewMemStorage(false, "")
-	srv := httptest.NewServer(BuildRouter(storage))
+	var storage = storage2.NewMemStorage()
+	srv := httptest.NewServer(BuildRouter(storage, nil)) // todo -использовать мок
 	defer srv.Close()
 
 	resp, err := resty.New().R().
@@ -68,17 +71,22 @@ func TestCounterAdd(t *testing.T) {
 
 	assert.NoError(t, err, "error making HTTP request")
 	assert.Equal(t, http.StatusOK, resp.StatusCode())
-	val, ok := storage.Counter("m1")
-	assert.True(t, ok)
-	assert.Equal(t, val, int64(5))
+	val, err := storage.GetByTypeAndID(context.Background(), "m1", models.CounterMetricName)
+	assert.NoError(t, err)
+	assert.Equal(t, *val.Delta, int64(5))
 }
 
 func TestGet(t *testing.T) {
-	var storage = storage2.NewMemStorage(false, "")
-	_ = storage.AddGauge("g1", 1.001)
-	_ = storage.AddCounter("c1", 2)
+	ctx := context.Background()
+	var storage = storage2.NewMemStorage()
 
-	srv := httptest.NewServer(BuildRouter(storage))
+	gValue := 1.001
+	_ = storage.Save(ctx, &models.Metric{ID: "g1", MType: models.GaugeMetricName, Value: &gValue})
+
+	cValue := int64(2)
+	_ = storage.Save(ctx, &models.Metric{ID: "c1", MType: models.CounterMetricName, Delta: &cValue})
+
+	srv := httptest.NewServer(BuildRouter(storage, nil)) // todo -использовать мок
 	defer srv.Close()
 
 	resp, err := resty.New().R().

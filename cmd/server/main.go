@@ -1,8 +1,11 @@
 package main
 
 import (
+	"context"
+	"database/sql"
+	"github.com/DenisPavlov/monitoring/internal/database"
+	"github.com/DenisPavlov/monitoring/internal/handler"
 	"github.com/DenisPavlov/monitoring/internal/logger"
-	"github.com/DenisPavlov/monitoring/internal/routing"
 	"github.com/DenisPavlov/monitoring/internal/storage"
 	"net/http"
 	"os"
@@ -25,34 +28,40 @@ func run() error {
 		return err
 	}
 
-	var memStorage *storage.MemStorage
-	if flagRestore {
-		store, err := storage.LoadFromFile(flagStoreInterval == 0, flagFileStoragePath)
-		if err != nil {
-			logger.Log.Error("Can not load storage from file. ", err.Error())
-			store = storage.NewMemStorage(flagStoreInterval == 0, flagFileStoragePath)
-		}
-		memStorage = store
-	} else {
-		memStorage = storage.NewMemStorage(flagStoreInterval == 0, flagFileStoragePath)
+	db, err := database.InitDB(flagDatabaseDSN)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	var store storage.MetricsStorage
+	store, err = initStorage(db)
+	if err != nil {
+		logger.Log.Error("Error initializing storage", err)
+		store = storage.NewMemStorage()
 	}
 
-	router := routing.BuildRouter(memStorage)
+	if fileStorage, ok := store.(*storage.FileMetricsStorage); ok {
+		go storeMetricsIfNeeded(flagStoreInterval, flagFileStoragePath, fileStorage)
+	}
+
+	router := handler.BuildRouter(store, db)
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
 	go func() {
 		for sig := range c {
 			logger.Log.Infoln("Server shutting down", sig)
-			err = shutDown(flagFileStoragePath, memStorage)
-			if err != nil {
-				logger.Log.Errorln(err)
+			fileStore, isFileStore := store.(*storage.FileMetricsStorage)
+			if isFileStore {
+				err := fileStore.SaveToFile()
+				if err != nil {
+					logger.Log.Errorln(err)
+				}
 			}
 			os.Exit(0)
 		}
 	}()
-
-	go storeMetricsIfNeeded(flagStoreInterval, flagFileStoragePath, memStorage)
 
 	logger.Log.Infoln("Running server on", flagRunAddr)
 	if err := http.ListenAndServe(flagRunAddr, router); err != nil {
@@ -62,17 +71,60 @@ func run() error {
 	return nil
 }
 
-func shutDown(filename string, store *storage.MemStorage) error {
-	return storage.SaveToFile(filename, store)
+func initStorage(db *sql.DB) (store storage.MetricsStorage, err error) {
+	if flagDatabaseDSN != "" {
+		return initDBStorage(db)
+	}
+	if flagFileStoragePath != "" {
+		return initFileStorage()
+	}
+	return initMemoryStorage()
 }
 
-func storeMetricsIfNeeded(flagStoreInterval int, filename string, store *storage.MemStorage) {
+func initMemoryStorage() (storage.MetricsStorage, error) {
+	logger.Log.Infoln("Initializing memory storage")
+	return storage.NewMemStorage(), nil
+}
+
+func initFileStorage() (storage.MetricsStorage, error) {
+	var fileStorage *storage.FileMetricsStorage
+	var err error
+
+	if flagRestore {
+		logger.Log.Infoln("Initializing file storage from file", flagFileStoragePath)
+		fileStorage, err = storage.InitFromFile(flagStoreInterval == 0, flagFileStoragePath)
+		if err != nil {
+			logger.Log.Error("Can not load storage from file.", err)
+			fileStorage = storage.NewFileStorage(flagStoreInterval == 0, flagFileStoragePath)
+		}
+	} else {
+		logger.Log.Infoln("Initializing file storage with new file", flagFileStoragePath)
+		fileStorage = storage.NewFileStorage(flagStoreInterval == 0, flagFileStoragePath)
+	}
+
+	return fileStorage, nil
+}
+
+func initDBStorage(db *sql.DB) (storage.MetricsStorage, error) {
+	logger.Log.Infoln("Initializing postgres database storage")
+	store, err := storage.NewPostgresStorage(db)
+	if err != nil {
+		return nil, err
+	}
+	err = store.InitSchema(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	return store, nil
+}
+
+func storeMetricsIfNeeded(flagStoreInterval int, filename string, store *storage.FileMetricsStorage) {
 	if flagStoreInterval != 0 {
 		count := 1
 		for {
 			if count%flagStoreInterval == 0 {
 				logger.Log.Infoln("Store metrics to file ", filename)
-				err := storage.SaveToFile(filename, store)
+				err := store.SaveToFile()
 				if err != nil {
 					logger.Log.Errorln(err)
 				}

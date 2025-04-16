@@ -41,7 +41,7 @@ Content-Type: application/json
 {
   "id": "add.product",
   "type": "counter",
-  "delta": 10
+  "delta": 11
 }
 
 ### update gauge by json
@@ -51,7 +51,7 @@ Content-Type: application/json
 {
   "id": "cpu.usage.total",
   "type": "gauge",
-  "value": 100.01
+  "value": 100.11
 }
 
 ### get json metric by type
@@ -82,3 +82,25 @@ Accept-Encoding: gzip
   "type": "gauge",
   "value": 100.01
 }
+
+### scheck sql connection
+GET localhost:8080/ping
+
+### add list of metrics
+POST localhost:8080/updates/
+Content-Type: application/json
+Accept-Encoding: gzip
+Accept: application/json
+
+[
+  {
+    "id": "cpu.usage.total",
+    "type": "gauge",
+    "value": 100.02
+  },
+  {
+    "id": "add.product",
+    "type": "counter",
+    "delta": 12
+  }
+]

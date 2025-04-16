@@ -13,6 +13,7 @@ var (
 	flagStoreInterval   int
 	flagFileStoragePath string
 	flagRestore         bool
+	flagDatabaseDSN     string
 )
 
 func parseFlags() error {
@@ -20,8 +21,9 @@ func parseFlags() error {
 	flag.StringVar(&flagLogLevel, "l", "Info", "log level")
 	flag.StringVar(&flagRunEnv, "e", "production", "Run environment")
 	flag.IntVar(&flagStoreInterval, "i", 300, "File store interval in seconds")
-	flag.StringVar(&flagFileStoragePath, "f", "storage.json", "Storage file path")
+	flag.StringVar(&flagFileStoragePath, "f", "", "Storage file path")
 	flag.BoolVar(&flagRestore, "r", false, "Load storage data from file")
+	flag.StringVar(&flagDatabaseDSN, "d", "", "Database DSN")
 	flag.Parse()
 
 	if envRunAddr := os.Getenv("ADDRESS"); envRunAddr != "" {
@@ -55,5 +57,10 @@ func parseFlags() error {
 		}
 		flagRestore = val
 	}
+
+	if envDatabaseDSN := os.Getenv("DATABASE_DSN"); envDatabaseDSN != "" {
+		flagDatabaseDSN = envDatabaseDSN
+	}
+
 	return nil
 }

@@ -3,31 +3,35 @@ package main
 import (
 	"github.com/DenisPavlov/monitoring/internal/client"
 	"github.com/DenisPavlov/monitoring/internal/logger"
-	"github.com/DenisPavlov/monitoring/internal/measure"
+	"github.com/DenisPavlov/monitoring/internal/service"
 	"log"
 	"time"
 )
 
 func main() {
-	parseFlags()
+	if err := parseFlags(); err != nil {
+		log.Fatal(err)
+	}
 	if err := run(); err != nil {
 		log.Fatal(err)
 	}
 }
 
 func run() error {
-	counts := make(map[string]int64)
-	var gauges map[string]float64
+	var (
+		counter = make(map[string]int64)
+		gauges  map[string]float64
+	)
 	count := 1
 
 	for {
 		if count%flagPollInterval == 0 {
-			gauges = measure.Gauge()
-			counts = measure.Count(counts)
+			gauges = metrics.Gauge()
+			counter = metrics.Count(counter)
 		}
 
 		if count%flagReportInterval == 0 {
-			if err := client.PostMetrics(flagRunAddr, counts, gauges); err != nil {
+			if err := client.PostMetrics(flagRunAddr, counter, gauges); err != nil {
 				logger.Log.Error(err)
 			}
 		}
