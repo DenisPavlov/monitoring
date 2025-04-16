@@ -45,7 +45,7 @@ func run() error {
 		go storeMetricsIfNeeded(flagStoreInterval, flagFileStoragePath, fileStorage)
 	}
 
-	router := handler.BuildRouter(store, db)
+	router := handler.BuildRouter(store, db, flagKey)
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)

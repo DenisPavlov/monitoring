@@ -9,6 +9,7 @@ import (
 	"github.com/DenisPavlov/monitoring/internal/models"
 	"github.com/DenisPavlov/monitoring/internal/storage"
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"net/http"
 	"reflect"
 	"strconv"
@@ -20,11 +21,14 @@ const (
 	getBasePath    = "/value"
 )
 
-// todo - попробовать выпилить db
-func BuildRouter(storage storage.MetricsStorage, db *sql.DB) chi.Router {
+func BuildRouter(storage storage.MetricsStorage, db *sql.DB, signKey string) chi.Router {
 	r := chi.NewRouter()
 	r.Use(logger.RequestLogger)
 	r.Use(GzipMiddleware)
+	if signKey != "" {
+		r.Use(SHA256SignMiddleware(signKey))
+	}
+	r.Use(middleware.Timeout(60 * time.Second))
 	r.Route(updateBasePath, func(r chi.Router) {
 		r.Post("/", updateMetricHandler(storage))
 		r.Post("/{mType}/{mName}/{mValue}", saveMetricsHandler(storage))

@@ -31,7 +31,7 @@ func run() error {
 		}
 
 		if count%flagReportInterval == 0 {
-			if err := client.PostMetrics(flagRunAddr, counter, gauges); err != nil {
+			if err := client.PostMetrics(flagRunAddr, flagKey, counter, gauges); err != nil {
 				logger.Log.Error(err)
 			}
 		}

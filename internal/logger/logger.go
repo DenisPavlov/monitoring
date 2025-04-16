@@ -7,7 +7,6 @@ import (
 	"time"
 )
 
-// todo - Вопрос к ревьюеру. Нормально ли отдавать так log объект? Ведь его могут изменить
 var Log = log.New()
 
 func Initialize(level string, env string) error {
