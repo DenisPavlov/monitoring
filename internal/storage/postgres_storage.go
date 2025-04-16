@@ -18,20 +18,23 @@ type PostgresMetricsStorage struct {
 	db *sql.DB
 }
 
-func NewPostgresStorage(ctx context.Context, db *sql.DB) (*PostgresMetricsStorage, error) {
-	return queryWithRetries(func() (*PostgresMetricsStorage, error) {
-		_, err := db.ExecContext(ctx, `
+func NewPostgresStorage(db *sql.DB) (*PostgresMetricsStorage, error) {
+	return &PostgresMetricsStorage{db: db}, nil
+}
+
+func (s *PostgresMetricsStorage) InitSchema(ctx context.Context) error {
+	return execWithRetries(func() error {
+		_, err := s.db.ExecContext(ctx, `
 		CREATE TABLE IF NOT EXISTS metrics (
-		    id TEXT,
+		    id TEXT PRIMARY KEY,
 		    type TEXT,
 		    delta BIGINT,
-		    value DOUBLE PRECISION,
-		    PRIMARY KEY (id, type))`,
+		    value DOUBLE PRECISION)`,
 		)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		return &PostgresMetricsStorage{db: db}, nil
+		return nil
 	})
 }
 
@@ -54,7 +57,10 @@ func (s *PostgresMetricsStorage) Save(ctx context.Context, metric *models.Metric
 func saveOne(ctx context.Context, metric *models.Metric, tx *sql.Tx) error {
 	switch metric.MType {
 	case models.GaugeMetricName:
-		_, err := tx.ExecContext(ctx, `INSERT INTO metrics (id, type, value) VALUES ($1, $2, $3) ON CONFLICT (id, type) DO UPDATE SET value = $3`, metric.ID, metric.MType, metric.Value)
+		_, err := tx.ExecContext(ctx, `
+			INSERT INTO metrics (id, type, value) VALUES ($1, $2, $3) 
+			ON CONFLICT (id) DO UPDATE SET value = $3
+			`, metric.ID, metric.MType, metric.Value)
 		if err != nil {
 			return err
 		}
@@ -62,7 +68,7 @@ func saveOne(ctx context.Context, metric *models.Metric, tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx, `
 			INSERT INTO metrics (id, type, delta)
 			VALUES ($1, $2, $3)
-			ON CONFLICT (id, type) DO UPDATE
+			ON CONFLICT (id) DO UPDATE
 			SET delta = metrics.delta + EXCLUDED.delta
 		`, metric.ID, metric.MType, metric.Delta)
 		if err != nil {

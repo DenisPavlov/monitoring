@@ -40,6 +40,11 @@ func run() error {
 		logger.Log.Error("Error initializing storage", err)
 		store = storage.NewMemStorage()
 	}
+
+	if fileStorage, ok := store.(*storage.FileMetricsStorage); ok {
+		go storeMetricsIfNeeded(flagStoreInterval, flagFileStoragePath, fileStorage)
+	}
+
 	router := handler.BuildRouter(store, db)
 
 	c := make(chan os.Signal, 1)
@@ -72,7 +77,6 @@ func initStorage(db *sql.DB) (store storage.MetricsStorage, err error) {
 	}
 	if flagFileStoragePath != "" {
 		return initFileStorage()
-
 	}
 	return initMemoryStorage()
 }
@@ -98,20 +102,23 @@ func initFileStorage() (storage.MetricsStorage, error) {
 		fileStorage = storage.NewFileStorage(flagStoreInterval == 0, flagFileStoragePath)
 	}
 
-	go storeMetricsIfNeeded(flagStoreInterval, flagFileStoragePath, *fileStorage)
 	return fileStorage, nil
 }
 
 func initDBStorage(db *sql.DB) (storage.MetricsStorage, error) {
 	logger.Log.Infoln("Initializing postgres database storage")
-	store, err := storage.NewPostgresStorage(context.Background(), db)
+	store, err := storage.NewPostgresStorage(db)
+	if err != nil {
+		return nil, err
+	}
+	err = store.InitSchema(context.Background())
 	if err != nil {
 		return nil, err
 	}
 	return store, nil
 }
 
-func storeMetricsIfNeeded(flagStoreInterval int, filename string, store storage.FileMetricsStorage) {
+func storeMetricsIfNeeded(flagStoreInterval int, filename string, store *storage.FileMetricsStorage) {
 	if flagStoreInterval != 0 {
 		count := 1
 		for {

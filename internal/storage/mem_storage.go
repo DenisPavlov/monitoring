@@ -34,7 +34,7 @@ func (s *MemoryMetricsStorage) Save(ctx context.Context, metric *models.Metric) 
 		case models.GaugeMetricName:
 			s.metrics[key] = *metric
 		case models.CounterMetricName:
-			m, err := s.GetByTypeAndID(ctx, metric.ID, models.CounterMetricName)
+			m, err := s.getByTypeAndID(metric.ID, models.CounterMetricName)
 			if err != nil {
 				return err
 			}
@@ -67,18 +67,28 @@ func (s *MemoryMetricsStorage) GetByTypeAndID(ctx context.Context, ID, mType str
 	case <-ctx.Done():
 		return res, ctx.Err()
 	default:
-		key, err := key(models.Metric{ID: ID, MType: mType})
-		if err != nil {
-			return res, err
-		}
-		return s.metrics[key], nil
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		return s.getByTypeAndID(ID, mType)
 	}
 }
+
+// should be called with locked mutex MemoryMetricsStorage.mu
+func (s *MemoryMetricsStorage) getByTypeAndID(ID, mType string) (res models.Metric, err error) {
+	key, err := key(models.Metric{ID: ID, MType: mType})
+	if err != nil {
+		return res, err
+	}
+	return s.metrics[key], nil
+}
+
 func (s *MemoryMetricsStorage) GetAllByType(ctx context.Context, mType string) (res []models.Metric, err error) {
 	select {
 	case <-ctx.Done():
 		return res, ctx.Err()
 	default:
+		s.mu.Lock()
+		defer s.mu.Unlock()
 		for _, metric := range s.metrics {
 			if metric.MType == mType {
 				res = append(res, metric)
