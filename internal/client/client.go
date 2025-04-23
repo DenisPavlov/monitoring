@@ -63,31 +63,17 @@ func postMetric(host, signKey string, metrics []models.Metric) error {
 	return nil
 }
 
-func PostMetrics(host, signKey string, counters map[string]int64, gauges map[string]float64) error {
-
-	var metrics []models.Metric
-	for name, value := range gauges {
-		metric := models.Metric{
-			ID:    name,
-			MType: "gauge",
-			Value: &value,
-		}
-		metrics = append(metrics, metric)
+func PostMetricsAsync(host, signKey string, workers int, metrics <-chan []models.Metric) {
+	for i := 0; i < workers; i++ {
+		go func(workerId int) {
+			for m := range metrics {
+				logger.Log.Infof("Posting metrics by workerId: %d", workerId)
+				if err := postMetric(host, signKey, m); err != nil {
+					logger.Log.Errorf("Posting metrics failed: %s", err.Error())
+				}
+			}
+		}(i)
 	}
-
-	for name, value := range counters {
-		metric := models.Metric{
-			ID:    name,
-			MType: "counter",
-			Delta: &value,
-		}
-		metrics = append(metrics, metric)
-	}
-	err := postMetric(host, signKey, metrics)
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 func shouldRetry(resp *http.Response) bool {

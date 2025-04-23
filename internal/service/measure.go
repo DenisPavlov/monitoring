@@ -3,6 +3,9 @@ package metrics
 import (
 	"math/rand"
 	"runtime"
+
+	"github.com/shirou/gopsutil/v4/load"
+	"github.com/shirou/gopsutil/v4/mem"
 )
 
 func Gauge() map[string]float64 {
@@ -37,6 +40,17 @@ func Gauge() map[string]float64 {
 		"Sys":           float64(ms.Sys),
 		"TotalAlloc":    float64(ms.TotalAlloc),
 		"RandomValue":   rand.Float64(),
+	}
+}
+
+func AdditionalGauge() map[string]float64 {
+	memory, _ := mem.VirtualMemory()
+	avg, _ := load.Avg()
+
+	return map[string]float64{
+		"TotalMemory":     float64(memory.Total),
+		"FreeMemory":      float64(memory.Free),
+		"CPUutilization1": avg.Load1,
 	}
 }
 
