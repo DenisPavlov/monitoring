@@ -3,36 +3,41 @@ package main
 import (
 	"context"
 	"database/sql"
-	"github.com/DenisPavlov/monitoring/internal/database"
-	"github.com/DenisPavlov/monitoring/internal/handler"
-	"github.com/DenisPavlov/monitoring/internal/logger"
-	"github.com/DenisPavlov/monitoring/internal/storage"
 	"net/http"
 	"os"
 	"os/signal"
 	"time"
+
+	"github.com/DenisPavlov/monitoring/cmd/server/config"
+	"github.com/DenisPavlov/monitoring/internal/database"
+	"github.com/DenisPavlov/monitoring/internal/handler"
+	"github.com/DenisPavlov/monitoring/internal/logger"
+	"github.com/DenisPavlov/monitoring/internal/storage"
 )
 
 func main() {
 	if err := run(); err != nil {
 		logger.Log.Error(err.Error())
+		os.Exit(1)
 	}
 }
 
 func run() error {
-	err := parseFlags()
+	err := config.ParseFlags()
 	if err != nil {
 		return err
 	}
-	if err = logger.Initialize(flagLogLevel, flagRunEnv); err != nil {
+	if err = logger.Initialize(config.FlagLogLevel, config.FlagRunEnv); err != nil {
 		return err
 	}
 
-	db, err := database.InitDB(flagDatabaseDSN)
+	db, err := database.InitDB(config.FlagDatabaseDSN)
 	if err != nil {
 		return err
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	var store storage.MetricsStorage
 	store, err = initStorage(db)
@@ -42,10 +47,10 @@ func run() error {
 	}
 
 	if fileStorage, ok := store.(*storage.FileMetricsStorage); ok {
-		go storeMetricsIfNeeded(flagStoreInterval, flagFileStoragePath, fileStorage)
+		go storeMetricsIfNeeded(config.FlagStoreInterval, config.FlagFileStoragePath, fileStorage)
 	}
 
-	router := handler.BuildRouter(store, db, flagKey)
+	router := handler.BuildRouter(store, db, config.FlagKey)
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
@@ -63,8 +68,8 @@ func run() error {
 		}
 	}()
 
-	logger.Log.Infoln("Running server on", flagRunAddr)
-	if err := http.ListenAndServe(flagRunAddr, router); err != nil {
+	logger.Log.Infoln("Running server on", config.FlagRunAddr)
+	if err := http.ListenAndServe(config.FlagRunAddr, router); err != nil {
 		return err
 	}
 
@@ -72,10 +77,10 @@ func run() error {
 }
 
 func initStorage(db *sql.DB) (store storage.MetricsStorage, err error) {
-	if flagDatabaseDSN != "" {
+	if config.FlagDatabaseDSN != "" {
 		return initDBStorage(db)
 	}
-	if flagFileStoragePath != "" {
+	if config.FlagFileStoragePath != "" {
 		return initFileStorage()
 	}
 	return initMemoryStorage()
@@ -90,16 +95,16 @@ func initFileStorage() (storage.MetricsStorage, error) {
 	var fileStorage *storage.FileMetricsStorage
 	var err error
 
-	if flagRestore {
-		logger.Log.Infoln("Initializing file storage from file", flagFileStoragePath)
-		fileStorage, err = storage.InitFromFile(flagStoreInterval == 0, flagFileStoragePath)
+	if config.FlagRestore {
+		logger.Log.Infoln("Initializing file storage from file", config.FlagFileStoragePath)
+		fileStorage, err = storage.InitFromFile(config.FlagStoreInterval == 0, config.FlagFileStoragePath)
 		if err != nil {
 			logger.Log.Error("Can not load storage from file.", err)
-			fileStorage = storage.NewFileStorage(flagStoreInterval == 0, flagFileStoragePath)
+			fileStorage = storage.NewFileStorage(config.FlagStoreInterval == 0, config.FlagFileStoragePath)
 		}
 	} else {
-		logger.Log.Infoln("Initializing file storage with new file", flagFileStoragePath)
-		fileStorage = storage.NewFileStorage(flagStoreInterval == 0, flagFileStoragePath)
+		logger.Log.Infoln("Initializing file storage with new file", config.FlagFileStoragePath)
+		fileStorage = storage.NewFileStorage(config.FlagStoreInterval == 0, config.FlagFileStoragePath)
 	}
 
 	return fileStorage, nil

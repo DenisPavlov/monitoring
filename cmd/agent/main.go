@@ -1,16 +1,21 @@
 package main
 
 import (
+	"context"
+	"log"
+	"os/signal"
+	"sync"
+	"syscall"
+	"time"
+
+	"github.com/DenisPavlov/monitoring/cmd/agent/config"
 	"github.com/DenisPavlov/monitoring/internal/client"
 	"github.com/DenisPavlov/monitoring/internal/models"
 	"github.com/DenisPavlov/monitoring/internal/service"
-	"log"
-	"sync"
-	"time"
 )
 
 func main() {
-	if err := parseFlags(); err != nil {
+	if err := config.ParseFlags(); err != nil {
 		log.Fatal(err)
 	}
 	if err := run(); err != nil {
@@ -19,90 +24,117 @@ func main() {
 }
 
 func run() error {
-	var wg sync.WaitGroup
-	wg.Add(1)
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer cancel()
 
-	commonChan := make(chan []models.Metric)
-	additionalChan := make(chan []models.Metric)
-	go poolCommon(flagPollInterval, commonChan)
-	go poolAdditional(flagPollInterval, additionalChan)
+	var wg sync.WaitGroup
+
+	metricsChan := make(chan []models.Metric)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		collectAndSend(ctx, time.Duration(config.FlagPollInterval)*time.Second, metricsChan)
+	}()
 
 	reportChan := make(chan []models.Metric)
-	go report(flagReportInterval, reportChan, commonChan, additionalChan)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		collectReport(ctx, time.Duration(config.FlagReportInterval)*time.Second, metricsChan, reportChan)
+	}()
 
-	client.PostMetricsAsync(flagRunAddr, flagKey, flagRateLimit, reportChan)
+	wg.Add(config.FlagRateLimit)
+	for i := 0; i < config.FlagRateLimit; i++ {
+		go func(workerID int) {
+			defer wg.Done()
+			postMetricsWorker(ctx, workerID, reportChan)
+		}(i)
+	}
 
 	wg.Wait()
 
 	return nil
 }
 
-func report(reportInterval int, reportChan chan<- []models.Metric, metricsChan ...chan []models.Metric) {
-	for _, ch := range metricsChan {
-		go func() {
-			ticker := time.NewTicker(time.Duration(reportInterval) * time.Second)
-			for m := range ch {
-				currentMetrics := m
-				select {
-				case <-ticker.C:
-					log.Printf("Sending metrics: %v", currentMetrics)
-					reportChan <- currentMetrics
-				default:
-					log.Printf("Skip sending metrics: %v", currentMetrics)
-				}
+func collectAndSend(ctx context.Context, interval time.Duration, out chan<- []models.Metric) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	counters := make(map[string]int64)
+
+	for {
+		select {
+		case <-ctx.Done():
+			close(out)
+			return
+		case <-ticker.C:
+			log.Printf("Collecting metrics")
+			var metricsBatch []models.Metric
+
+			for name, value := range metrics.Gauge() {
+				metricsBatch = append(metricsBatch, models.Metric{
+					ID:    name,
+					MType: "gauge",
+					Value: &value,
+				})
 			}
-		}()
+
+			for name, value := range metrics.AdditionalGauge() {
+				metricsBatch = append(metricsBatch, models.Metric{
+					ID:    name,
+					MType: "gauge",
+					Value: &value,
+				})
+			}
+
+			counters = metrics.Count(counters)
+			for name, value := range counters {
+				metricsBatch = append(metricsBatch, models.Metric{
+					ID:    name,
+					MType: "counter",
+					Delta: &value,
+				})
+			}
+
+			out <- metricsBatch
+		}
 	}
 }
 
-func poolCommon(poolInterval int, metricsCh chan<- []models.Metric) {
-	ticker := time.NewTicker(time.Duration(poolInterval) * time.Second)
-	var (
-		gauges   map[string]float64
-		counters = make(map[string]int64)
-	)
-
-	for range ticker.C {
-		log.Println("poolCommon metrics")
-		gauges = metrics.Gauge()
-		counters = metrics.Count(counters)
-
-		var res []models.Metric
-		for name, value := range gauges {
-			metric := models.Metric{
-				ID:    name,
-				MType: "gauge",
-				Value: &value,
+func postMetricsWorker(ctx context.Context, workerID int, in <-chan []models.Metric) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case metric, ok := <-in:
+			if !ok {
+				return
 			}
-			res = append(res, metric)
-		}
-
-		for name, value := range counters {
-			metric := models.Metric{
-				ID:    name,
-				MType: "counter",
-				Delta: &value,
+			log.Printf("[Worker %d] Sending %d metrics", workerID, len(metric))
+			if err := client.PostMetricsBatch(ctx, config.FlagRunAddr, config.FlagKey, metric); err != nil {
+				log.Printf("[Worker %d] Error sending metrics: %v", workerID, err)
 			}
-			res = append(res, metric)
 		}
-		metricsCh <- res
 	}
 }
 
-func poolAdditional(poolInterval int, metricsCh chan<- []models.Metric) {
-	ticker := time.NewTicker(time.Duration(poolInterval) * time.Second)
-	for range ticker.C {
-		log.Println("poolAdditional metrics")
-		gauges := metrics.AdditionalGauge()
-		var res []models.Metric
-		for name, value := range gauges {
-			metric := models.Metric{
-				ID:    name,
-				MType: "gauge",
-				Value: &value,
+func collectReport(ctx context.Context, interval time.Duration, in <-chan []models.Metric, out chan<- []models.Metric) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	var currentMetrics []models.Metric
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			log.Printf("Sending metrics: %v", currentMetrics)
+			out <- currentMetrics
+		case metric, ok := <-in:
+			if !ok {
+				return
 			}
-			res = append(res, metric)
+			currentMetrics = metric
 		}
-		metricsCh <- res
 	}
 }
