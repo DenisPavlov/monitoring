@@ -3,7 +3,9 @@ package client
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/json"
+	"github.com/DenisPavlov/monitoring/internal/handler"
 	"github.com/DenisPavlov/monitoring/internal/logger"
 	"github.com/DenisPavlov/monitoring/internal/models"
 	"github.com/DenisPavlov/monitoring/internal/util"
@@ -11,26 +13,35 @@ import (
 	"time"
 )
 
-func postMetric(host string, metrics []models.Metric) error {
+func postMetric(ctx context.Context, host, signKey string, metrics []models.Metric) error {
 
-	var buffer bytes.Buffer
-	gzipWriter := gzip.NewWriter(&buffer)
-	err := json.NewEncoder(gzipWriter).Encode(metrics)
+	strReqBody, err := json.Marshal(metrics)
 	if err != nil {
 		return err
 	}
+
+	var buffer bytes.Buffer
+	gzipWriter := gzip.NewWriter(&buffer)
+	if _, err := gzipWriter.Write(strReqBody); err != nil {
+		return err
+	}
+
 	err = gzipWriter.Close()
 	if err != nil {
 		return err
 	}
 
-	req, err := http.NewRequest("POST", "http://"+host+"/updates/", &buffer)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://"+host+"/updates/", &buffer)
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Content-Encoding", "gzip")
 	req.Header.Set("Accept-Encoding", "gzip")
+
+	if signKey != "" {
+		signRequest(req, strReqBody, signKey)
+	}
 
 	retries := 4
 	var resp *http.Response
@@ -53,28 +64,9 @@ func postMetric(host string, metrics []models.Metric) error {
 	return nil
 }
 
-func PostMetrics(host string, counters map[string]int64, gauges map[string]float64) error {
-
-	var metrics []models.Metric
-	for name, value := range gauges {
-		metric := models.Metric{
-			ID:    name,
-			MType: "gauge",
-			Value: &value,
-		}
-		metrics = append(metrics, metric)
-	}
-
-	for name, value := range counters {
-		metric := models.Metric{
-			ID:    name,
-			MType: "counter",
-			Delta: &value,
-		}
-		metrics = append(metrics, metric)
-	}
-	err := postMetric(host, metrics)
-	if err != nil {
+func PostMetricsBatch(ctx context.Context, host, signKey string, metrics []models.Metric) error {
+	if err := postMetric(ctx, host, signKey, metrics); err != nil {
+		logger.Log.Errorf("Posting metrics failed: %s", err.Error())
 		return err
 	}
 	return nil
@@ -87,4 +79,9 @@ func shouldRetry(resp *http.Response) bool {
 		return true
 	}
 	return false
+}
+
+func signRequest(req *http.Request, body []byte, key string) {
+	sign := util.GetHexSHA256(key, body)
+	req.Header.Set(handler.SHA256HeaderName, sign)
 }
