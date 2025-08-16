@@ -4,9 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"time"
+
 	"github.com/DenisPavlov/monitoring/internal/models"
 	"github.com/DenisPavlov/monitoring/internal/util"
-	"time"
 
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -111,7 +112,7 @@ func (s *PostgresMetricsStorage) GetByTypeAndID(ctx context.Context, ID, mType s
 
 func (s *PostgresMetricsStorage) GetAllByType(ctx context.Context, mType string) ([]models.Metric, error) {
 	return queryWithRetries(func() ([]models.Metric, error) {
-		rows, err := s.db.QueryContext(ctx, `SELECT id, type, delta, value FROM metrics WHERE type = $1`, mType)
+		rows, err := s.db.QueryContext(ctx, `SELECT id, type, COALESCE(delta, 0), COALESCE(value,0) FROM metrics WHERE type = $1`, mType)
 		if err != nil {
 			return nil, err
 		}
@@ -119,7 +120,10 @@ func (s *PostgresMetricsStorage) GetAllByType(ctx context.Context, mType string)
 
 		metrics := make([]models.Metric, 0)
 		for rows.Next() {
-			var metric models.Metric
+			var metric = models.Metric{
+				Value: new(float64),
+				Delta: new(int64),
+			}
 			if err := rows.Scan(&metric.ID, &metric.MType, metric.Delta, metric.Value); err != nil {
 				return nil, err
 			}

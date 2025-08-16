@@ -8,11 +8,14 @@ import (
 	"os/signal"
 	"time"
 
+	_ "net/http/pprof"
+
 	"github.com/DenisPavlov/monitoring/cmd/server/config"
 	"github.com/DenisPavlov/monitoring/internal/database"
 	"github.com/DenisPavlov/monitoring/internal/handler"
 	"github.com/DenisPavlov/monitoring/internal/logger"
 	"github.com/DenisPavlov/monitoring/internal/storage"
+	"golang.org/x/sync/errgroup"
 )
 
 func main() {
@@ -68,11 +71,26 @@ func run() error {
 		}
 	}()
 
-	logger.Log.Infoln("Running server on", config.FlagRunAddr)
-	if err := http.ListenAndServe(config.FlagRunAddr, router); err != nil {
+	g, _ := errgroup.WithContext(context.Background())
+	g.Go(func() error {
+		logger.Log.Infoln("Running server on", config.FlagRunAddr)
+		if err := http.ListenAndServe(config.FlagRunAddr, router); err != nil {
+			return err
+		}
+		return nil
+	})
+
+	g.Go(func() error {
+		logger.Log.Infoln("Running debug server on", "localhost:8082")
+		if err := http.ListenAndServe("localhost:8082", nil); err != nil {
+			return err
+		}
+		return nil
+	})
+
+	if err := g.Wait(); err != nil {
 		return err
 	}
-
 	return nil
 }
 

@@ -5,15 +5,16 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"reflect"
+	"strconv"
+	"time"
+
 	"github.com/DenisPavlov/monitoring/internal/logger"
 	"github.com/DenisPavlov/monitoring/internal/models"
 	"github.com/DenisPavlov/monitoring/internal/storage"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"net/http"
-	"reflect"
-	"strconv"
-	"time"
 )
 
 const (
@@ -160,7 +161,9 @@ func getAllMetricsHandler(storage storage.MetricsStorage) http.HandlerFunc {
 
 		gauges, err := storage.GetAllByType(r.Context(), models.GaugeMetricName)
 		if err != nil {
+			logger.Log.Errorf("Can not get all gauge metrics: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
+			return
 		}
 		for _, value := range gauges {
 			page += fmt.Sprintf("\n<p>%s - %f</p>", value.ID, *value.Value)
@@ -168,7 +171,9 @@ func getAllMetricsHandler(storage storage.MetricsStorage) http.HandlerFunc {
 
 		counters, err := storage.GetAllByType(r.Context(), models.CounterMetricName)
 		if err != nil {
+			logger.Log.Errorf("Can not get all counter metrics: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
+			return
 		}
 		for _, value := range counters {
 			page += fmt.Sprintf("\n<p>%s - %d</p>", value.ID, *value.Delta)

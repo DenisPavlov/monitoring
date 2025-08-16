@@ -32,7 +32,7 @@ GET localhost:8080/value/counter/add.product1
 
 ### get all metrics
 GET localhost:8080/
-Accept-Encoding: gzip
+Accept-Encoding:
 
 ### update counter by json
 POST localhost:8080/update
