@@ -2,9 +2,10 @@ package storage
 
 import (
 	"context"
+	"testing"
+
 	"github.com/DenisPavlov/monitoring/internal/models"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestNewMemStorage(t *testing.T) {
@@ -35,17 +36,3 @@ func TestMemStorage_Add(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, int64(2), *actual.Delta)
 }
-
-//func TestMemStorage_All(t *testing.T) {
-//	s := NewMemStorage()
-//	_ = s.AddCounter("c1", 1)
-//	_ = s.AddCounter("c2", 1)
-//	_ = s.AddGauge("g1", 1.01)
-//	_ = s.AddGauge("g2", 1.01)
-//
-//	gRes := s.AllGauges()
-//	assert.True(t, reflect.DeepEqual(gRes, map[string]float64{"g1": 1.01, "g2": 1.01}))
-//
-//	cRes := s.AllCounters()
-//	assert.True(t, reflect.DeepEqual(cRes, map[string]int64{"c1": 1, "c2": 1}))
-//}
