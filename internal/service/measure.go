@@ -1,3 +1,5 @@
+// Package metrics provides functionality for collecting and processing
+// system metrics including memory statistics, CPU utilization, and custom counters.
 package metrics
 
 import (
@@ -8,6 +10,27 @@ import (
 	"github.com/shirou/gopsutil/v4/mem"
 )
 
+// Gauge collects and returns a comprehensive set of Go runtime memory statistics
+// and a random value as gauge metrics.
+//
+// The function retrieves memory allocation data from runtime.MemStats and
+// includes a random value for sampling purposes.
+//
+// Returns:
+//   - map[string]float64: Map of gauge metric names to their float64 values
+//
+// Collected metrics include:
+//   - Memory allocation statistics (Alloc, HeapAlloc, HeapSys, etc.)
+//   - Garbage collection metrics (GCCPUFraction, NumGC, PauseTotalNs, etc.)
+//   - Memory cache and span statistics (MCacheInuse, MSpanSys, etc.)
+//   - System memory statistics (Sys, OtherSys, etc.)
+//   - RandomValue: A random float64 value between 0 and 1 for sampling
+//
+// Example usage:
+//
+//	gauges := metrics.Gauge()
+//	fmt.Printf("Memory allocated: %f\n", gauges["Alloc"])
+//	fmt.Printf("Random value: %f\n", gauges["RandomValue"])
 func Gauge() map[string]float64 {
 	ms := runtime.MemStats{}
 	runtime.ReadMemStats(&ms)
@@ -43,6 +66,28 @@ func Gauge() map[string]float64 {
 	}
 }
 
+// AdditionalGauge collects and returns system-level metrics including
+// memory information and CPU utilization using the gopsutil library.
+//
+// This function provides insights into system-wide resource usage beyond
+// the Go runtime-specific metrics provided by Gauge().
+//
+// Returns:
+//   - map[string]float64: Map of additional gauge metric names to their values
+//
+// Collected metrics include:
+//   - TotalMemory: Total available system memory in bytes
+//   - FreeMemory: Free system memory in bytes
+//   - CPUutilization1: 1-minute load average (CPU utilization)
+//
+// Note: Errors from underlying system calls are ignored and zero values
+// are returned for failed metrics.
+//
+// Example usage:
+//
+//	systemMetrics := metrics.AdditionalGauge()
+//	fmt.Printf("Total memory: %f bytes\n", systemMetrics["TotalMemory"])
+//	fmt.Printf("CPU load (1min): %f\n", systemMetrics["CPUutilization1"])
 func AdditionalGauge() map[string]float64 {
 	memory, _ := mem.VirtualMemory()
 	avg, _ := load.Avg()
@@ -54,6 +99,28 @@ func AdditionalGauge() map[string]float64 {
 	}
 }
 
+// Count increments and returns counter metrics. Specifically, it increments
+// the "PollCount" counter and returns the updated counters map.
+//
+// This function is used to track the number of metric collection cycles
+// or other countable events in the system.
+//
+// Parameters:
+//   - counters: Map of counter names to their current int64 values
+//
+// Returns:
+//   - map[string]int64: Updated counters map with PollCount incremented by 1
+//
+// Example usage:
+//
+//	counters := make(map[string]int64)
+//	counters["PollCount"] = 0
+//
+//	// After each poll
+//	counters = metrics.Count(counters)
+//	fmt.Printf("Poll count: %d\n", counters["PollCount"])
+//
+// The function modifies the input map in place and returns it for convenience.
 func Count(counters map[string]int64) map[string]int64 {
 	counters["PollCount"] = counters["PollCount"] + 1
 	return counters
