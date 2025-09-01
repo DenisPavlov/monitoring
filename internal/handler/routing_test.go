@@ -2,11 +2,12 @@ package handler
 
 import (
 	"context"
-	"github.com/DenisPavlov/monitoring/internal/models"
-	storage2 "github.com/DenisPavlov/monitoring/internal/storage"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/DenisPavlov/monitoring/internal/models"
+	storage2 "github.com/DenisPavlov/monitoring/internal/storage"
 
 	"github.com/go-resty/resty/v2"
 	"github.com/stretchr/testify/assert"

@@ -1,3 +1,5 @@
+// Package client provides functionality for sending metrics to a monitoring server.
+// It includes features like request compression, signing, and retry mechanisms.
 package client
 
 import (
@@ -5,12 +7,13 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"net/http"
+	"time"
+
 	"github.com/DenisPavlov/monitoring/internal/handler"
 	"github.com/DenisPavlov/monitoring/internal/logger"
 	"github.com/DenisPavlov/monitoring/internal/models"
 	"github.com/DenisPavlov/monitoring/internal/util"
-	"net/http"
-	"time"
 )
 
 func postMetric(ctx context.Context, host, signKey string, metrics []models.Metric) error {
@@ -64,6 +67,27 @@ func postMetric(ctx context.Context, host, signKey string, metrics []models.Metr
 	return nil
 }
 
+// PostMetricsBatch sends a batch of metrics to the monitoring server.
+//
+// This is the public interface for sending metrics. It wraps the internal
+// postMetric function with error logging.
+//
+// Parameters:
+//   - ctx: context for request cancellation and timeout
+//   - host: target server address (format: "host:port")
+//   - signKey: cryptographic key for request signing
+//   - metrics: slice of Metric objects to send
+//
+// Returns:
+//   - error: if the metrics posting operation fails
+//
+// Example usage:
+//
+//	metrics := []models.Metric{...}
+//	err := client.PostMetricsBatch(ctx, "localhost:8080", "secret-key", metrics)
+//	if err != nil {
+//	    // handle error
+//	}
 func PostMetricsBatch(ctx context.Context, host, signKey string, metrics []models.Metric) error {
 	if err := postMetric(ctx, host, signKey, metrics); err != nil {
 		logger.Log.Errorf("Posting metrics failed: %s", err.Error())

@@ -5,15 +5,16 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"reflect"
+	"strconv"
+	"time"
+
 	"github.com/DenisPavlov/monitoring/internal/logger"
 	"github.com/DenisPavlov/monitoring/internal/models"
 	"github.com/DenisPavlov/monitoring/internal/storage"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"net/http"
-	"reflect"
-	"strconv"
-	"time"
 )
 
 const (
@@ -21,6 +22,30 @@ const (
 	getBasePath    = "/value"
 )
 
+// BuildRouter constructs and configures the chi router with all application routes.
+//
+// The router includes middleware for:
+//   - Request logging
+//   - Gzip compression/decompression
+//   - SHA256 signature verification (if signKey is provided)
+//   - 60-second request timeout
+//
+// Routes configured:
+//   - POST /update/ - Update metric via JSON
+//   - POST /update/{mType}/{mName}/{mValue} - Update metric via URL parameters
+//   - POST /value/ - Get metric via JSON request
+//   - GET /value/{mType}/{mName} - Get metric via URL parameters
+//   - GET /ping - Database health check
+//   - POST /updates/ - Batch update multiple metrics
+//   - GET / - Get all metrics as HTML page
+//
+// Parameters:
+//   - storage: MetricsStorage implementation for data persistence
+//   - db: Database connection for health checks
+//   - signKey: Cryptographic key for request signature verification (empty disables)
+//
+// Returns:
+//   - chi.Router: Configured router with all middleware and routes
 func BuildRouter(storage storage.MetricsStorage, db *sql.DB, signKey string) chi.Router {
 	r := chi.NewRouter()
 	r.Use(logger.RequestLogger)
@@ -43,10 +68,22 @@ func BuildRouter(storage storage.MetricsStorage, db *sql.DB, signKey string) chi
 	return r
 }
 
+// pingDBHandler returns a handler for database health checks.
+//
+// The handler pings the database with a 1-second timeout and returns:
+//   - HTTP 200 if the database is reachable
+//   - HTTP 500 if the database connection fails
 func pingDBHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 		defer cancel()
+
+		defer func() {
+			if err := recover(); r != nil {
+				logger.Log.Error("Error pinging database: ", err)
+				w.WriteHeader(http.StatusInternalServerError)
+			}
+		}()
 
 		if err := db.PingContext(ctx); err != nil {
 			logger.Log.Error("Error pinging database: ", err)
@@ -57,6 +94,18 @@ func pingDBHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
+// saveMetricsHandler returns a handler for saving metrics via URL parameters.
+//
+// URL format: /update/{mType}/{mName}/{mValue}
+//
+// Parameters:
+//   - mType: Metric type ("gauge" or "counter")
+//   - mName: Metric name/identifier
+//   - mValue: Metric value (float for gauge, integer for counter)
+//
+// Returns:
+//   - HTTP 400 for invalid parameters or save errors
+//   - HTTP 200 on successful save
 func saveMetricsHandler(storage storage.MetricsStorage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		mType := chi.URLParam(r, "mType")
@@ -78,6 +127,18 @@ func saveMetricsHandler(storage storage.MetricsStorage) http.HandlerFunc {
 	}
 }
 
+// getMetricHandler returns a handler for retrieving metrics via URL parameters.
+//
+// URL format: /value/{mType}/{mName}
+//
+// Parameters:
+//   - mType: Metric type ("gauge" or "counter")
+//   - mName: Metric name/identifier
+//
+// Returns:
+//   - HTTP 400 for invalid parameters or retrieval errors
+//   - HTTP 404 if metric not found
+//   - HTTP 200 with metric value in response body
 func getMetricHandler(storage storage.MetricsStorage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		mType := chi.URLParam(r, "mType")
@@ -109,6 +170,16 @@ func getMetricHandler(storage storage.MetricsStorage) http.HandlerFunc {
 	}
 }
 
+// getJSONMetricHandler returns a handler for retrieving metrics via JSON request.
+//
+// Expected JSON request body format:
+//
+//	{"id": "metricName", "mType": "gauge|counter"}
+//
+// Returns:
+//   - HTTP 400 for invalid JSON or retrieval errors
+//   - HTTP 404 if metric not found
+//   - HTTP 200 with metric data in JSON format
 func getJSONMetricHandler(storage storage.MetricsStorage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req models.Metric
@@ -138,6 +209,16 @@ func getJSONMetricHandler(storage storage.MetricsStorage) http.HandlerFunc {
 	}
 }
 
+// updatesHandler returns a handler for batch updating multiple metrics.
+//
+// Expected JSON request body format: array of Metric objects
+//
+//	[{"id": "name1", "mType": "gauge", "value": 1.23}, ...]
+//
+// Returns:
+//   - HTTP 400 for invalid JSON
+//   - HTTP 500 for storage errors
+//   - HTTP 200 on successful batch save
 func updatesHandler(storage storage.MetricsStorage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req []models.Metric
@@ -154,13 +235,22 @@ func updatesHandler(storage storage.MetricsStorage) http.HandlerFunc {
 	}
 }
 
+// getAllMetricsHandler returns a handler for retrieving all metrics as HTML.
+//
+// Returns an HTML page displaying all gauge and counter metrics with their values.
+//
+// Returns:
+//   - HTTP 500 for storage errors
+//   - HTTP 200 with HTML content
 func getAllMetricsHandler(storage storage.MetricsStorage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		page := "<!DOCTYPE html><html><body>"
 
 		gauges, err := storage.GetAllByType(r.Context(), models.GaugeMetricName)
 		if err != nil {
+			logger.Log.Errorf("Can not get all gauge metrics: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
+			return
 		}
 		for _, value := range gauges {
 			page += fmt.Sprintf("\n<p>%s - %f</p>", value.ID, *value.Value)
@@ -168,7 +258,9 @@ func getAllMetricsHandler(storage storage.MetricsStorage) http.HandlerFunc {
 
 		counters, err := storage.GetAllByType(r.Context(), models.CounterMetricName)
 		if err != nil {
+			logger.Log.Errorf("Can not get all counter metrics: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
+			return
 		}
 		for _, value := range counters {
 			page += fmt.Sprintf("\n<p>%s - %d</p>", value.ID, *value.Delta)
@@ -181,6 +273,15 @@ func getAllMetricsHandler(storage storage.MetricsStorage) http.HandlerFunc {
 	}
 }
 
+// updateMetricHandler returns a handler for updating metrics via JSON request.
+//
+// Expected JSON request body format: Metric object
+//
+//	{"id": "metricName", "mType": "gauge|counter", "value": 1.23, "delta": 42}
+//
+// Returns:
+//   - HTTP 400 for invalid JSON or save errors
+//   - HTTP 200 with updated metric data in JSON format
 func updateMetricHandler(storage storage.MetricsStorage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req models.Metric
