@@ -5,12 +5,13 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"net/http"
+	"time"
+
 	"github.com/DenisPavlov/monitoring/internal/handler"
 	"github.com/DenisPavlov/monitoring/internal/logger"
 	"github.com/DenisPavlov/monitoring/internal/models"
 	"github.com/DenisPavlov/monitoring/internal/util"
-	"net/http"
-	"time"
 )
 
 func postMetric(ctx context.Context, host, signKey string, metrics []models.Metric) error {
