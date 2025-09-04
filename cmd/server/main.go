@@ -21,7 +21,6 @@ import (
 func main() {
 	if err := run(); err != nil {
 		logger.Log.Error(err.Error())
-		os.Exit(1)
 	}
 }
 
