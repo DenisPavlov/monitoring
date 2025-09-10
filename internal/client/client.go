@@ -17,7 +17,6 @@ import (
 )
 
 func postMetric(ctx context.Context, host, signKey string, metrics []models.Metric) error {
-
 	strReqBody, err := json.Marshal(metrics)
 	if err != nil {
 		return err
@@ -25,7 +24,7 @@ func postMetric(ctx context.Context, host, signKey string, metrics []models.Metr
 
 	var buffer bytes.Buffer
 	gzipWriter := gzip.NewWriter(&buffer)
-	if _, err := gzipWriter.Write(strReqBody); err != nil {
+	if _, err = gzipWriter.Write(strReqBody); err != nil {
 		return err
 	}
 

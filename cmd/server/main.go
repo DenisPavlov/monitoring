@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -18,10 +19,20 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+var (
+	buildVersion = "N/A"
+	buildDate    = "N/A"
+	buildCommit  = "N/A"
+)
+
 func main() {
+	fmt.Printf(`Build version: %s
+Build date: %s
+Build commit: %s
+`, buildVersion, buildDate, buildCommit)
+
 	if err := run(); err != nil {
 		logger.Log.Error(err.Error())
-		os.Exit(1)
 	}
 }
 

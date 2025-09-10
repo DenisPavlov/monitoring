@@ -166,7 +166,7 @@ func (s *PostgresMetricsStorage) SaveAll(ctx context.Context, metrics []models.M
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeout
-//   - ID: Metric identifier name
+//   - id: Metric identifier name
 //   - mType: Metric type ("gauge" or "counter")
 //
 // Returns:
@@ -174,9 +174,9 @@ func (s *PostgresMetricsStorage) SaveAll(ctx context.Context, metrics []models.M
 //   - error: If database operation fails after all retry attempts
 //
 // Note: Returns empty Metric without error if no matching record is found.
-func (s *PostgresMetricsStorage) GetByTypeAndID(ctx context.Context, ID, mType string) (metric models.Metric, err error) {
+func (s *PostgresMetricsStorage) GetByTypeAndID(ctx context.Context, id, mType string) (metric models.Metric, err error) {
 	return queryWithRetries(func() (models.Metric, error) {
-		row := s.db.QueryRowContext(ctx, `SELECT id, type, delta, value FROM metrics WHERE id = $1 AND type = $2`, ID, mType)
+		row := s.db.QueryRowContext(ctx, `SELECT id, type, delta, value FROM metrics WHERE id = $1 AND type = $2`, id, mType)
 		if err = row.Scan(&metric.ID, &metric.MType, &metric.Delta, &metric.Value); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return metric, nil
@@ -259,7 +259,7 @@ func shouldRetry(err error) bool {
 // Uses exponential backoff between retry attempts.
 func queryWithRetries[T any](action func() (T, error)) (result T, err error) {
 	for i := 0; i < attempts; i++ {
-		result, err := action()
+		result, err = action()
 		if shouldRetry(err) {
 			time.Sleep(util.Backoff(i))
 		} else {
@@ -281,7 +281,7 @@ func queryWithRetries[T any](action func() (T, error)) (result T, err error) {
 // Uses exponential backoff between retry attempts.
 func execWithRetries(action func() error) (err error) {
 	for i := 0; i < attempts; i++ {
-		err := action()
+		err = action()
 		if shouldRetry(err) {
 			time.Sleep(util.Backoff(i))
 		} else {
