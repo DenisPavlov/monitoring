@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os/signal"
 	"sync"
@@ -14,7 +15,18 @@ import (
 	"github.com/DenisPavlov/monitoring/internal/service"
 )
 
+var (
+	buildVersion = "N/A"
+	buildDate    = "N/A"
+	buildCommit  = "N/A"
+)
+
 func main() {
+	fmt.Printf(`Build version: %s
+Build date: %s
+Build commit: %s
+`, buildVersion, buildDate, buildCommit)
+
 	if err := config.ParseFlags(); err != nil {
 		log.Fatal(err)
 	}
