@@ -9,12 +9,21 @@ import (
 	"time"
 
 	"github.com/DenisPavlov/monitoring/cmd/agent/config"
+	"github.com/DenisPavlov/monitoring/internal/build/info"
 	"github.com/DenisPavlov/monitoring/internal/client"
 	"github.com/DenisPavlov/monitoring/internal/models"
 	"github.com/DenisPavlov/monitoring/internal/service"
 )
 
+var (
+	buildVersion = "N/A"
+	buildDate    = "N/A"
+	buildCommit  = "N/A"
+)
+
 func main() {
+	info.PrintBuildInfo(buildVersion, buildDate, buildCommit)
+
 	if err := config.ParseFlags(); err != nil {
 		log.Fatal(err)
 	}
