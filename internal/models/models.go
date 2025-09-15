@@ -25,13 +25,6 @@ const (
 //
 // JSON tags are provided for compatibility with REST API operations.
 type Metric struct {
-	// ID is the unique name identifier of the metric.
-	// Example: "cpu_usage", "memory_used", "request_count"
-	ID string `json:"id"`
-
-	// MType is the metric type, either "gauge" or "counter".
-	MType string `json:"type"`
-
 	// Delta is the value for counter metrics. Only present when MType is "counter".
 	// The pointer allows for proper JSON omitempty behavior.
 	Delta *int64 `json:"delta,omitempty"`
@@ -39,6 +32,13 @@ type Metric struct {
 	// Value is the value for gauge metrics. Only present when MType is "gauge".
 	// The pointer allows for proper JSON omitempty behavior.
 	Value *float64 `json:"value,omitempty"`
+
+	// ID is the unique name identifier of the metric.
+	// Example: "cpu_usage", "memory_used", "request_count"
+	ID string `json:"id"`
+
+	// MType is the metric type, either "gauge" or "counter".
+	MType string `json:"type"`
 }
 
 // CreateMetric creates a new Metric instance from string parameters.

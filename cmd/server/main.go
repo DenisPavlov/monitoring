@@ -11,6 +11,7 @@ import (
 	_ "net/http/pprof"
 
 	"github.com/DenisPavlov/monitoring/cmd/server/config"
+	"github.com/DenisPavlov/monitoring/internal/build/info"
 	"github.com/DenisPavlov/monitoring/internal/database"
 	"github.com/DenisPavlov/monitoring/internal/handler"
 	"github.com/DenisPavlov/monitoring/internal/logger"
@@ -18,10 +19,16 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+var (
+	buildVersion = "N/A"
+	buildDate    = "N/A"
+	buildCommit  = "N/A"
+)
+
 func main() {
+	info.PrintBuildInfo(buildVersion, buildDate, buildCommit)
 	if err := run(); err != nil {
 		logger.Log.Error(err.Error())
-		os.Exit(1)
 	}
 }
 

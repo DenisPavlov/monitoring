@@ -12,8 +12,8 @@ import (
 // MemoryMetricsStorage implements in-memory storage for metrics using a thread-safe map.
 // It provides basic CRUD operations for metrics with proper concurrency control.
 type MemoryMetricsStorage struct {
-	mu      sync.Mutex
 	metrics map[string]models.Metric
+	mu      sync.Mutex
 }
 
 // NewMemStorage creates a new instance of MemoryMetricsStorage with an empty metrics map.
@@ -113,7 +113,7 @@ func (s *MemoryMetricsStorage) SaveAll(ctx context.Context, metrics []models.Met
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeout
-//   - ID: Metric identifier name
+//   - id: Metric identifier name
 //   - mType: Metric type ("gauge" or "counter")
 //
 // Returns:
@@ -123,14 +123,14 @@ func (s *MemoryMetricsStorage) SaveAll(ctx context.Context, metrics []models.Met
 // Example usage:
 //
 //	metric, err := storage.GetByTypeAndID(ctx, "cpu_usage", "gauge")
-func (s *MemoryMetricsStorage) GetByTypeAndID(ctx context.Context, ID, mType string) (res models.Metric, err error) {
+func (s *MemoryMetricsStorage) GetByTypeAndID(ctx context.Context, id, mType string) (res models.Metric, err error) {
 	select {
 	case <-ctx.Done():
 		return res, ctx.Err()
 	default:
 		s.mu.Lock()
 		defer s.mu.Unlock()
-		return s.getByTypeAndID(ID, mType)
+		return s.getByTypeAndID(id, mType)
 	}
 }
 
@@ -138,14 +138,14 @@ func (s *MemoryMetricsStorage) GetByTypeAndID(ctx context.Context, ID, mType str
 // Must be called with mutex already locked.
 //
 // Parameters:
-//   - ID: Metric identifier name
+//   - id: Metric identifier name
 //   - mType: Metric type ("gauge" or "counter")
 //
 // Returns:
 //   - models.Metric: Found metric or empty Metric if not found
 //   - error: If metric validation fails
-func (s *MemoryMetricsStorage) getByTypeAndID(ID, mType string) (res models.Metric, err error) {
-	key, err := key(models.Metric{ID: ID, MType: mType})
+func (s *MemoryMetricsStorage) getByTypeAndID(id, mType string) (res models.Metric, err error) {
+	key, err := key(models.Metric{ID: id, MType: mType})
 	if err != nil {
 		return res, err
 	}

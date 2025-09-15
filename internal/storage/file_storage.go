@@ -15,8 +15,8 @@ import (
 // The storage supports both synchronous and asynchronous file saving modes.
 type FileMetricsStorage struct {
 	*MemoryMetricsStorage
-	needToSaveSync bool
 	filename       string
+	needToSaveSync bool
 }
 
 // jsonMetrics is an internal struct used for JSON serialization/deserialization
@@ -69,14 +69,14 @@ func InitFromFile(needToSaveSync bool, filename string) (*FileMetricsStorage, er
 		return nil, err
 	}
 
-	jsonMetrics := jsonMetrics{}
-	err = json.Unmarshal(data, &jsonMetrics)
+	jMetrics := jsonMetrics{}
+	err = json.Unmarshal(data, &jMetrics)
 	if err != nil {
 		return nil, err
 	}
 
 	storage := FileMetricsStorage{
-		MemoryMetricsStorage: &MemoryMetricsStorage{metrics: jsonMetrics.Metrics},
+		MemoryMetricsStorage: &MemoryMetricsStorage{metrics: jMetrics.Metrics},
 		needToSaveSync:       needToSaveSync,
 		filename:             filename,
 	}

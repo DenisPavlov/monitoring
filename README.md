@@ -1,5 +1,5 @@
-- To run server run `go run cmd/server/main.go -d "host=localhost user=postgres password=postgres dbname=examples sslmode=disable"`
-- To run agent run `go run cmd/agent/main.go`
+- To run server run `go run -ldflags "-X main.buildVersion=v1.0.1 -X 'main.buildDate=$(date +'%Y/%m/%d %H:%M:%S')' -X main.buildCommit=$(git log -1 --pretty=format:"%h")" cmd/server/main.go -d "host=localhost user=postgres password=postgres dbname=examples sslmode=disable"`
+- To run agent run `go run -ldflags "-X main.buildVersion=v1.0.1 -X 'main.buildDate=$(date +'%Y/%m/%d %H:%M:%S')' -X main.buildCommit=$(git log -1 --pretty=format:"%h")" cmd/agent/main.go`
 
 ### Default flags
 - d "host=localhost user=postgres password=postgres dbname=examples sslmode=disable"
@@ -15,3 +15,8 @@
 Было выполнено профилирование сервера при стандартной работе агента. Профиль собирался в течении 5-ти минут работы сервера.
 Было произведено 3 замера. При анализе профиля не было выявлено каких-либо утечек и мест для оптимизации.
 Файлы с профилем расположены в `/profiles`.
+
+## статический анализ кода
+для запуска статического анализатора необходимо выполнить следующие команды:
+- `go build -o staticlint cmd/staticlint/main.go` - собрать бинарник анализатора
+- `./staticlint ./...` - запуск анализатора на всех файлах проекта
