@@ -27,7 +27,7 @@ func TestSaveMetrics(t *testing.T) {
 	}
 
 	var storage = storage2.NewMemStorage()
-	srv := httptest.NewServer(BuildRouter(storage, nil, "")) // todo -использовать мок
+	srv := httptest.NewServer(BuildRouter(storage, nil, "", nil))
 	defer srv.Close()
 
 	for _, tc := range testCases {
@@ -46,7 +46,7 @@ func TestSaveMetrics(t *testing.T) {
 
 func TestGaugeAdd(t *testing.T) {
 	var storage = storage2.NewMemStorage()
-	srv := httptest.NewServer(BuildRouter(storage, nil, "")) // todo -использовать мок
+	srv := httptest.NewServer(BuildRouter(storage, nil, "", nil))
 	defer srv.Close()
 
 	resp, err := resty.New().R().
@@ -63,7 +63,7 @@ func TestGaugeAdd(t *testing.T) {
 
 func TestCounterAdd(t *testing.T) {
 	var storage = storage2.NewMemStorage()
-	srv := httptest.NewServer(BuildRouter(storage, nil, "")) // todo -использовать мок
+	srv := httptest.NewServer(BuildRouter(storage, nil, "", nil))
 	defer srv.Close()
 
 	resp, err := resty.New().R().
@@ -87,7 +87,7 @@ func TestGet(t *testing.T) {
 	cValue := int64(2)
 	_ = storage.Save(ctx, &models.Metric{ID: "c1", MType: models.CounterMetricName, Delta: &cValue})
 
-	srv := httptest.NewServer(BuildRouter(storage, nil, "")) // todo -использовать мок
+	srv := httptest.NewServer(BuildRouter(storage, nil, "", nil))
 	defer srv.Close()
 
 	resp, err := resty.New().R().

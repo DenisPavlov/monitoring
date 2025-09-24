@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/rsa"
 	"database/sql"
 	"net/http"
 	"os"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/DenisPavlov/monitoring/cmd/server/config"
 	"github.com/DenisPavlov/monitoring/internal/build/info"
+	"github.com/DenisPavlov/monitoring/internal/crypto"
 	"github.com/DenisPavlov/monitoring/internal/database"
 	"github.com/DenisPavlov/monitoring/internal/handler"
 	"github.com/DenisPavlov/monitoring/internal/logger"
@@ -60,7 +62,16 @@ func run() error {
 		go storeMetricsIfNeeded(config.FlagStoreInterval, config.FlagFileStoragePath, fileStorage)
 	}
 
-	router := handler.BuildRouter(store, db, config.FlagKey)
+	var privateKey *rsa.PrivateKey
+	if config.CryptoKey != "" {
+		key, err := crypto.LoadPrivateKey(config.CryptoKey)
+		if err != nil {
+			return err
+		}
+		privateKey = key
+	}
+
+	router := handler.BuildRouter(store, db, config.FlagKey, privateKey)
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)

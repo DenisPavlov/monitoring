@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"crypto/rsa"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -46,10 +47,13 @@ const (
 //
 // Returns:
 //   - chi.Router: Configured router with all middleware and routes
-func BuildRouter(storage storage.MetricsStorage, db *sql.DB, signKey string) chi.Router {
+func BuildRouter(storage storage.MetricsStorage, db *sql.DB, signKey string, key *rsa.PrivateKey) chi.Router {
 	r := chi.NewRouter()
 	r.Use(logger.RequestLogger)
 	r.Use(GzipMiddleware)
+	if key != nil {
+		r.Use(PrivateKeyDecodingMiddleware(key))
+	}
 	if signKey != "" {
 		r.Use(SHA256SignMiddleware(signKey))
 	}

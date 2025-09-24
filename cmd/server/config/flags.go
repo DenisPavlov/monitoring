@@ -48,6 +48,10 @@ var (
 	// FlagKey is the key used to verify request signatures.
 	// Used for security and request authentication purposes.
 	FlagKey string
+
+	// CryptoKey is the public key file path
+	// Used to encrypt the client request body
+	CryptoKey string
 )
 
 // ParseFlags parses command line flags and environment variables.
@@ -66,6 +70,7 @@ var (
 //   - RESTORE: restore flag (equivalent to flag -r)
 //   - DATABASE_DSN: database DSN (equivalent to flag -d)
 //   - KEY: signature key (equivalent to flag -k)
+//   - CRYPTO_KEY:  public key file path (equivalent to flag -crypto-key)
 //
 // Returns an error if:
 //   - numeric values (STORE_INTERVAL) cannot be converted
@@ -96,6 +101,7 @@ func ParseFlags() error {
 	flag.BoolVar(&FlagRestore, "r", false, "Load storage data from file")
 	flag.StringVar(&FlagDatabaseDSN, "d", "", "Database DSN")
 	flag.StringVar(&FlagKey, "k", "", "key used to check the request sign")
+	flag.StringVar(&CryptoKey, "crypto-key", "", "crypto key to sign the request")
 	flag.Parse()
 
 	if envRunAddr := os.Getenv("ADDRESS"); envRunAddr != "" {
@@ -136,6 +142,10 @@ func ParseFlags() error {
 
 	if envKey := os.Getenv("KEY"); envKey != "" {
 		FlagKey = envKey
+	}
+
+	if envCryptoKey := os.Getenv("CRYPTO_KEY"); envCryptoKey != "" {
+		CryptoKey = envCryptoKey
 	}
 
 	return nil
