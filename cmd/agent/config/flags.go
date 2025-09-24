@@ -34,6 +34,10 @@ var (
 	// Used to limit the load on both client and server.
 	// Default: 5 concurrent requests.
 	FlagRateLimit int
+
+	// CryptoKey is the public key file path
+	// Used to encrypt the client request body
+	CryptoKey string
 )
 
 // ParseFlags parses command line flags and environment variables for agent configuration.
@@ -57,6 +61,7 @@ var (
 //   - POLL_INTERVAL: poll interval in seconds (equivalent to flag -p)
 //   - KEY: signing key (equivalent to flag -k)
 //   - RATE_LIMIT: rate limit (equivalent to flag -l)
+//   - CRYPTO_KEY:  public key file path (equivalent to flag -crypto-key)
 //
 // Returns an error if:
 //   - numeric values (REPORT_INTERVAL, POLL_INTERVAL, RATE_LIMIT) cannot be converted from strings
@@ -84,6 +89,7 @@ func ParseFlags() error {
 	flag.IntVar(&FlagPollInterval, "p", 2, "frequency of getting runtime metrics in seconds")
 	flag.StringVar(&FlagKey, "k", "", "key used to sign the request")
 	flag.IntVar(&FlagRateLimit, "l", 5, "rate limit")
+	flag.StringVar(&CryptoKey, "crypto-key", "", "crypto key to sign the request")
 	flag.Parse()
 
 	if envRunAddr := os.Getenv("ADDRESS"); envRunAddr != "" {
@@ -112,6 +118,10 @@ func ParseFlags() error {
 			return err
 		}
 		FlagRateLimit = val
+	}
+
+	if envCryptoKey := os.Getenv("CRYPTO_KEY"); envCryptoKey != "" {
+		CryptoKey = envCryptoKey
 	}
 
 	return nil

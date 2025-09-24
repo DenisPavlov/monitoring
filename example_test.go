@@ -67,7 +67,7 @@ func (m *MockStorage) Ping(ctx context.Context) error {
 func Example_updateMetricHandler() {
 	mockStorage := NewMockStorage()
 	db := &sql.DB{}
-	router := handler.BuildRouter(mockStorage, db, "")
+	router := handler.BuildRouter(mockStorage, db, "", nil)
 
 	gaugeMetric := models.Metric{
 		ID:    "test_gauge",
@@ -98,7 +98,7 @@ func Example_updateMetricHandler() {
 func Example_saveMetricsHandler() {
 	mockStorage := NewMockStorage()
 	db := &sql.DB{}
-	router := handler.BuildRouter(mockStorage, db, "")
+	router := handler.BuildRouter(mockStorage, db, "", nil)
 
 	req := httptest.NewRequest("POST", "/update/gauge/test_metric/42.5", nil)
 	w := httptest.NewRecorder()
@@ -123,7 +123,7 @@ func Example_saveMetricsHandler() {
 func Example_getMetricHandler() {
 	mockStorage := NewMockStorage()
 	db := &sql.DB{}
-	router := handler.BuildRouter(mockStorage, db, "")
+	router := handler.BuildRouter(mockStorage, db, "", nil)
 
 	testValue := 99.9
 	_ = mockStorage.Save(context.Background(), &models.Metric{
@@ -154,7 +154,7 @@ func Example_getMetricHandler() {
 func Example_getJSONMetricHandler() {
 	mockStorage := NewMockStorage()
 	db := &sql.DB{}
-	router := handler.BuildRouter(mockStorage, db, "")
+	router := handler.BuildRouter(mockStorage, db, "", nil)
 
 	testDelta := int64(100)
 	_ = mockStorage.Save(context.Background(), &models.Metric{
@@ -194,7 +194,7 @@ func Example_getJSONMetricHandler() {
 func Example_updatesHandler() {
 	mockStorage := NewMockStorage()
 	db := &sql.DB{}
-	router := handler.BuildRouter(mockStorage, db, "")
+	router := handler.BuildRouter(mockStorage, db, "", nil)
 
 	metrics := []models.Metric{
 		{
@@ -237,7 +237,7 @@ func Example_updatesHandler() {
 func Example_getAllMetricsHandler() {
 	mockStorage := NewMockStorage()
 	db := &sql.DB{}
-	router := handler.BuildRouter(mockStorage, db, "")
+	router := handler.BuildRouter(mockStorage, db, "", nil)
 
 	cpuValue := 65.5
 	memValue := 1024.0
@@ -282,7 +282,7 @@ func Example_pingDBHandler() {
 	mockStorage := NewMockStorage()
 
 	db := &sql.DB{}
-	router := handler.BuildRouter(mockStorage, db, "")
+	router := handler.BuildRouter(mockStorage, db, "", nil)
 
 	req := httptest.NewRequest("GET", "/ping", nil)
 	w := httptest.NewRecorder()
@@ -304,7 +304,7 @@ func Example_pingDBHandler() {
 func TestUpdateMetricHandler(t *testing.T) {
 	mockStorage := NewMockStorage()
 	db := &sql.DB{}
-	router := handler.BuildRouter(mockStorage, db, "")
+	router := handler.BuildRouter(mockStorage, db, "", nil)
 
 	tests := []struct {
 		name       string

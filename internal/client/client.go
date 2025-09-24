@@ -6,20 +6,52 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/rsa"
 	"encoding/json"
 	"net/http"
 	"time"
 
+	"github.com/DenisPavlov/monitoring/cmd/agent/config"
+	"github.com/DenisPavlov/monitoring/internal/crypto"
 	"github.com/DenisPavlov/monitoring/internal/handler"
 	"github.com/DenisPavlov/monitoring/internal/logger"
 	"github.com/DenisPavlov/monitoring/internal/models"
 	"github.com/DenisPavlov/monitoring/internal/util"
 )
 
-func postMetric(ctx context.Context, host, signKey string, metrics []models.Metric) error {
+type Client struct {
+	publicKey *rsa.PublicKey
+}
+
+func NewClient() (*Client, error) {
+	var publicKey *rsa.PublicKey
+
+	if config.CryptoKey != "" {
+		key, err := crypto.LoadPublicKey(config.CryptoKey)
+		if err != nil {
+			logger.Log.Errorf("Error loading public key: %v\n", err)
+			return nil, err
+		}
+		publicKey = key
+	}
+	return &Client{publicKey: publicKey}, nil
+}
+
+func (c *Client) postMetric(ctx context.Context, host, signKey string, metrics []models.Metric) error {
 	strReqBody, err := json.Marshal(metrics)
 	if err != nil {
 		return err
+	}
+
+	if c.publicKey != nil {
+		encryptedData, err := crypto.EncryptData(c.publicKey, strReqBody)
+		println(string(encryptedData))
+		if err == nil {
+			strReqBody = encryptedData
+		} else {
+			logger.Log.Errorf("Error encrypting data: %v\n", err)
+			return err
+		}
 	}
 
 	var buffer bytes.Buffer
@@ -87,8 +119,8 @@ func postMetric(ctx context.Context, host, signKey string, metrics []models.Metr
 //	if err != nil {
 //	    // handle error
 //	}
-func PostMetricsBatch(ctx context.Context, host, signKey string, metrics []models.Metric) error {
-	if err := postMetric(ctx, host, signKey, metrics); err != nil {
+func (c *Client) PostMetricsBatch(ctx context.Context, host, signKey string, metrics []models.Metric) error {
+	if err := c.postMetric(ctx, host, signKey, metrics); err != nil {
 		logger.Log.Errorf("Posting metrics failed: %s", err.Error())
 		return err
 	}

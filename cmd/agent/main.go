@@ -52,11 +52,16 @@ func run() error {
 		collectReport(ctx, time.Duration(config.FlagReportInterval)*time.Second, metricsChan, reportChan)
 	}()
 
+	c, err := client.NewClient()
+	if err != nil {
+		return err
+	}
+
 	wg.Add(config.FlagRateLimit)
 	for i := 0; i < config.FlagRateLimit; i++ {
 		go func(workerID int) {
 			defer wg.Done()
-			postMetricsWorker(ctx, workerID, reportChan)
+			postMetricsWorker(ctx, workerID, reportChan, c)
 		}(i)
 	}
 
@@ -110,7 +115,7 @@ func collectAndSend(ctx context.Context, interval time.Duration, out chan<- []mo
 	}
 }
 
-func postMetricsWorker(ctx context.Context, workerID int, in <-chan []models.Metric) {
+func postMetricsWorker(ctx context.Context, workerID int, in <-chan []models.Metric, client *client.Client) {
 	for {
 		select {
 		case <-ctx.Done():
